@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block titulo %}Dashboard comercial — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Dashboard comercial</h1>
+</div>
+
+<form method="GET" class="tarjeta" style="margin-bottom:18px">
+    <div class="fila-formulario">
+        <div>
+            <label for="id_sede">Sede</label>
+            <select id="id_sede" name="id_sede">
+                <option value="">Todas las sedes</option>
+                {% for sede in sedes %}
+                <option value="{{ sede.id_sede }}" {% if id_sede == sede.id_sede %}selected{% endif %}>
+                    {{ sede.nombre_sede }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="mes">Mes</label>
+            <input type="month" id="mes" name="mes" value="{{ '%04d-%02d'|format(anio, mes) }}">
+        </div>
+        <div style="flex:0; align-self:flex-end">
+            <button type="submit" class="boton-secundario">Filtrar</button>
+        </div>
+    </div>
+</form>
+
+<div class="grid-kpis">
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Ventas del mes <small>(total vendido)</small></div>
+        <div class="valor-kpi">S/ {{ "%.2f"|format(total_mes) }}</div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Ventas al contado</div>
+        <div class="valor-kpi">S/ {{ "%.2f"|format(ventas_contado) }}</div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Ventas a crédito</div>
+        <div class="valor-kpi">S/ {{ "%.2f"|format(ventas_credito) }}</div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Recuperaciones del mes <small>(cobros de cualquier periodo)</small></div>
+        <div class="valor-kpi">S/ {{ "%.2f"|format(recuperaciones_mes) }}</div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Ingreso de caja del mes <small>(contado + recuperaciones)</small></div>
+        <div class="valor-kpi">S/ {{ "%.2f"|format(ingreso_caja_mes) }}</div>
+    </div>
+</div>
+
+<div class="tarjeta" style="margin-bottom:18px">
+    <h2 style="font-size:16px;margin-top:0">
+        Recomendaciones urgentes de abastecimiento
+        {% if alertas_urgentes %}<span class="etiqueta etiqueta-alerta">{{ alertas_urgentes|length }}</span>{% endif %}
+    </h2>
+    {% if alertas_urgentes %}
+    <table class="tabla" id="tabla-alertas-urgentes" data-paginacion="5">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                {% if not id_sede %}<th>Sede</th>{% endif %}
+                <th>Por qué</th>
+                <th>Cantidad sugerida</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for alerta in alertas_urgentes %}
+            <tr>
+                <td>{{ alerta.producto }}</td>
+                {% if not id_sede %}<td>{{ alerta.sede }}</td>{% endif %}
+                <td>{{ alerta.motivo or '—' }}</td>
+                <td>{{ alerta.cantidad_sugerida }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="sin-resultados">Sin recomendaciones urgentes{{ ' en esta sede' if id_sede else '' }} por ahora.</p>
+    {% endif %}
+    <a href="{{ url_for('analitica.recomendaciones') }}" class="boton-secundario" style="margin-top:10px;display:inline-block">Ver todas las recomendaciones</a>
+</div>
+
+<div class="tarjeta" style="margin-bottom:18px">
+    <h2 style="font-size:16px;margin-top:0">
+        Alertas de stock bajo mínimo
+        {% if stock_bajo %}<span class="etiqueta etiqueta-alerta">{{ stock_bajo|length }}</span>{% endif %}
+    </h2>
+    {% if stock_bajo %}
+    <table class="tabla" id="tabla-stock-bajo" data-paginacion="5">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                {% if not id_sede %}<th>Sede</th>{% endif %}
+                <th>Stock actual</th>
+                <th>Stock mínimo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fila in stock_bajo %}
+            <tr>
+                <td>{{ fila.producto }}</td>
+                {% if not id_sede %}<td>{{ fila.sede }}</td>{% endif %}
+                <td>{{ fila.actual }}</td>
+                <td>{{ fila.minimo }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="sin-resultados">Sin alertas: todo el stock está sobre su mínimo{{ ' en esta sede' if id_sede else '' }}.</p>
+    {% endif %}
+</div>
+
+<div class="grid-graficos">
+    <div class="tarjeta">
+        <h2 style="font-size:16px;margin-top:0">Ventas por categoría</h2>
+        {% if ventas_por_categoria %}
+        <canvas id="grafico-categoria" height="220"
+                data-labels='{{ ventas_por_categoria | map(attribute="categoria") | list | tojson }}'
+                data-valores='{{ ventas_por_categoria | map(attribute="total") | list | tojson }}'></canvas>
+        {% else %}
+        <p class="sin-resultados">No hay ventas registradas en este periodo.</p>
+        {% endif %}
+    </div>
+    <div class="tarjeta">
+        <h2 style="font-size:16px;margin-top:0">Ventas por trabajador</h2>
+        {% if ventas_por_trabajador %}
+        <canvas id="grafico-trabajador" height="220"
+                data-labels='{{ ventas_por_trabajador | map(attribute="nombre") | list | tojson }}'
+                data-valores='{{ ventas_por_trabajador | map(attribute="total") | list | tojson }}'></canvas>
+        {% else %}
+        <p class="sin-resultados">No hay ventas registradas en este periodo.</p>
+        {% endif %}
+    </div>
+    <div class="tarjeta">
+        <h2 style="font-size:16px;margin-top:0">Productos más vendidos</h2>
+        {% if top_productos %}
+        <table class="tabla">
+            <thead>
+                <tr><th>#</th><th>Producto</th><th>Total vendido</th></tr>
+            </thead>
+            <tbody>
+                {% for fila in top_productos %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ fila.producto }}</td>
+                    <td>S/ {{ "%.2f"|format(fila.total) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="sin-resultados">No hay ventas registradas en este periodo.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/vendor/chart.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/paginacion.js') }}"></script>
+{% endblock %}

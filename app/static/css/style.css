@@ -1,0 +1,344 @@
+/* ---------------------------------------------------------------------
+   Variables de marca (paleta tomada de los mockups del proyecto)
+--------------------------------------------------------------------- */
+:root {
+    --verde-primario: #1f5c3b;
+    --verde-oscuro: #163f29;
+    --sidebar-bg: #1b1f1c;
+    --sidebar-texto: #c8cbc8;
+    --fondo-pagina: #f4f6f4;
+    --texto-principal: #22261f;
+    --texto-secundario: #6a6f68;
+    --borde: #e1e4df;
+    --rojo: #d64545;
+    --ambar: #e0a531;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--fondo-pagina);
+    color: var(--texto-principal);
+}
+
+a { text-decoration: none; color: inherit; }
+
+/* ---------------------------------------------------------------------
+   Layout general (sidebar + contenido)
+--------------------------------------------------------------------- */
+.layout { display: flex; min-height: 100vh; }
+
+.sidebar {
+    width: 240px;
+    background: var(--sidebar-bg);
+    color: var(--sidebar-texto);
+    padding: 24px 16px;
+    flex-shrink: 0;
+}
+
+.marca { display: flex; justify-content: center; margin-bottom: 28px; padding: 0 8px; }
+.marca-logo {
+    max-width: 100%;
+    height: auto;
+    background: #fff;
+    border-radius: 10px;
+    padding: 10px 14px;
+}
+
+.menu { display: flex; flex-direction: column; gap: 4px; }
+.menu-item {
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    color: var(--sidebar-texto);
+}
+.menu-item:hover { background: rgba(255,255,255,0.06); }
+.menu-item.activo { background: var(--verde-primario); color: #fff; }
+.menu-item.deshabilitado { opacity: 0.4; cursor: not-allowed; }
+
+.contenido { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 28px;
+    background: #fff;
+    border-bottom: 1px solid var(--borde);
+}
+.usuario-actual { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.usuario-rol {
+    background: var(--verde-primario);
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+}
+.usuario-nombre { color: var(--texto-secundario); }
+.boton-salir {
+    background: var(--rojo);
+    color: #fff;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+.pagina { padding: 28px; }
+
+/* ---------------------------------------------------------------------
+   Cabeceras de página / acciones
+--------------------------------------------------------------------- */
+.cabecera-pagina {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.cabecera-pagina h1 { font-size: 20px; margin: 0; }
+.acciones-cabecera { display: flex; gap: 10px; align-items: center; }
+
+.buscador {
+    padding: 8px 14px;
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    min-width: 220px;
+    font-size: 14px;
+}
+
+/* ---------------------------------------------------------------------
+   Tarjetas / tablas
+--------------------------------------------------------------------- */
+.tarjeta {
+    background: #fff;
+    border: 1px solid var(--borde);
+    border-radius: 10px;
+    padding: 20px;
+}
+.tarjeta-formulario { max-width: 620px; }
+
+.grid-kpis { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.tarjeta-kpi { flex: 1; min-width: 160px; }
+.tarjeta-kpi .etiqueta-kpi { font-size: 12px; color: var(--texto-secundario); }
+.tarjeta-kpi .etiqueta-kpi small { display: block; opacity: 0.75; }
+.tarjeta-kpi .valor-kpi { font-size: 22px; font-weight: 600; margin-top: 4px; }
+
+.grid-graficos { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+
+.paginacion { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
+.paginacion-info { font-size: 13px; color: var(--texto-secundario); }
+.paginacion button:disabled { opacity: 0.4; cursor: not-allowed; }
+.tarjeta-error { text-align: center; padding: 60px 20px; }
+
+.tarjeta-servicio-caido {
+    background: #fff;
+    max-width: 460px;
+    padding: 46px 38px;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+}
+.icono-servicio-caido { font-size: 30px; margin-bottom: 14px; }
+.tarjeta-servicio-caido h1 { font-size: 20px; margin: 0 0 12px; }
+.tarjeta-servicio-caido p { font-size: 14px; color: var(--texto-secundario); line-height: 1.6; }
+.tarjeta-servicio-caido .boton-primario { margin-top: 14px; text-decoration: none; }
+
+.tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tabla th {
+    text-align: left;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--texto-secundario);
+    padding: 10px 8px;
+    border-bottom: 2px solid var(--borde);
+}
+.tabla td { padding: 10px 8px; border-bottom: 1px solid var(--borde); }
+.tabla tr:hover td { background: #fafbfa; }
+
+.stock-critico { color: var(--rojo); font-weight: 600; }
+
+.etiqueta {
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 999px;
+}
+.etiqueta-activo { background: #e4f3ea; color: var(--verde-primario); }
+.etiqueta-inactivo { background: #f1f1ef; color: var(--texto-secundario); }
+.etiqueta-pendiente { background: #fdf3e0; color: var(--ambar); }
+.etiqueta-parcial { background: #f1e9fb; color: #6a3fa0; }
+.etiqueta-alerta { background: #fdeceb; color: var(--rojo); }
+.etiqueta-credito { background: #eaf1fb; color: #2b5fa8; }
+.etiqueta-contado { background: #f1f1ef; color: var(--texto-secundario); }
+
+/* ---------------------------------------------------------------------
+   Pestañas de subnavegación (dentro de Ventas consolidadas)
+--------------------------------------------------------------------- */
+.subnav-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--borde);
+}
+.subnav-tabs a {
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--texto-secundario);
+    border-bottom: 2px solid transparent;
+}
+.subnav-tabs a:hover { color: var(--texto-principal); }
+.subnav-tabs a.activo { color: var(--verde-primario); border-bottom-color: var(--verde-primario); }
+
+/* ---------------------------------------------------------------------
+   Líneas de producto del formulario de nueva venta
+--------------------------------------------------------------------- */
+.tabla-lineas input, .tabla-lineas select { width: 100%; }
+.tabla-lineas td { vertical-align: middle; }
+.total-venta {
+    text-align: right;
+    font-size: 16px;
+    font-weight: 700;
+    margin: 14px 0;
+}
+
+.celda-acciones { white-space: nowrap; }
+.icono-accion {
+    border: none;
+    background: none;
+    font-size: 15px;
+    cursor: pointer;
+    padding: 2px 6px;
+}
+
+.sin-resultados { text-align: center; color: var(--texto-secundario); padding: 24px 0 !important; }
+
+/* ---------------------------------------------------------------------
+   Formularios
+--------------------------------------------------------------------- */
+form label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin: 14px 0 6px;
+}
+form input, form select, form textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+}
+.fila-formulario { display: flex; gap: 16px; }
+.fila-formulario > div { flex: 1; }
+
+.acciones-formulario {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 22px;
+}
+
+.boton-primario, .boton-secundario {
+    display: inline-block;
+    padding: 9px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+}
+.boton-primario { background: var(--verde-primario); color: #fff; }
+.boton-primario:hover { background: var(--verde-oscuro); }
+.boton-secundario { background: #eef0ed; color: var(--texto-principal); }
+.boton-secundario.activo { background: var(--verde-primario); color: #fff; }
+.boton-ancho { width: 100%; margin-top: 20px; }
+
+/* ---------------------------------------------------------------------
+   Mensajes flash
+--------------------------------------------------------------------- */
+.mensajes { margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px; }
+.alerta { padding: 10px 14px; border-radius: 6px; font-size: 14px; }
+.alerta-success { background: #e4f3ea; color: #1f5c3b; }
+.alerta-danger { background: #fbe7e7; color: #a12f2f; }
+.alerta-warning { background: #fdf3e0; color: #8a5b0f; }
+
+/* ---------------------------------------------------------------------
+   Pantalla de login (HU-01) — replica el mockup Fig. 4
+--------------------------------------------------------------------- */
+.pagina-login {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: var(--sidebar-bg);
+}
+.login-tarjeta {
+    display: flex;
+    width: 900px;
+    max-width: 94vw;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+}
+.login-panel-marca {
+    flex: 1.1;
+    background: linear-gradient(160deg, var(--verde-primario), var(--verde-oscuro));
+    color: #fff;
+    padding: 46px 38px;
+}
+.marca-logo-grande {
+    width: 100%;
+    height: auto;
+    box-sizing: border-box;
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+}
+.login-eyebrow { font-size: 12px; letter-spacing: 1.5px; opacity: 0.85; margin-bottom: 8px; }
+.login-panel-marca h1 { font-size: 26px; line-height: 1.3; margin: 0 0 18px; }
+.login-descripcion { font-size: 13px; opacity: 0.85; line-height: 1.6; }
+.login-ubicacion { font-size: 12px; opacity: 0.75; margin-top: 26px; }
+
+.login-panel-form {
+    flex: 1;
+    background: #22261f;
+    color: #fff;
+    padding: 46px 38px;
+}
+.login-panel-form h2 { margin: 0 0 6px; font-size: 22px; }
+.login-subtitulo { font-size: 13px; color: #a9ada6; margin-bottom: 18px; }
+.login-panel-form label { color: #d7d9d4; }
+.login-panel-form input {
+    background: #2c312a;
+    border: 1px solid #3c4138;
+    color: #fff;
+}
+.login-panel-form input::placeholder { color: #767b71; }
+
+.campo-contrasena { position: relative; }
+.campo-contrasena input { padding-right: 42px; }
+.boton-ojo {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: #9aa096;
+}
+.boton-ojo:hover { color: #d7d9d4; }
+.icono-ojo-oculto { display: none; }
+
+@media (max-width: 720px) {
+    .login-tarjeta { flex-direction: column; }
+}

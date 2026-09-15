@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block titulo %}Reportes comerciales — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Reportes comerciales</h1>
+</div>
+
+<form method="GET" class="tarjeta" style="margin-bottom:18px">
+    <div class="fila-formulario">
+        <div>
+            <label for="tipo">Tipo de reporte</label>
+            <select id="tipo" name="tipo">
+                <option value="ventas" {% if tipo == 'ventas' %}selected{% endif %}>Ventas</option>
+                <option value="productos" {% if tipo == 'productos' %}selected{% endif %}>Productos más vendidos</option>
+            </select>
+        </div>
+        <div>
+            <label for="desde">Desde</label>
+            <input type="date" id="desde" name="desde" value="{{ desde.isoformat() }}">
+        </div>
+        <div>
+            <label for="hasta">Hasta</label>
+            <input type="date" id="hasta" name="hasta" value="{{ hasta.isoformat() }}">
+        </div>
+        <div>
+            <label for="id_sede">Sede</label>
+            <select id="id_sede" name="id_sede">
+                <option value="">Todas las sedes</option>
+                {% for sede in sedes %}
+                <option value="{{ sede.id_sede }}" {% if id_sede == sede.id_sede %}selected{% endif %}>
+                    {{ sede.nombre_sede }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="acciones-formulario" style="justify-content:flex-start">
+        <button type="submit" class="boton-primario">Generar reporte</button>
+        <button type="submit" formaction="{{ url_for('reportes.exportar') }}" class="boton-secundario">
+            ⬇ Exportar CSV
+        </button>
+    </div>
+</form>
+
+{% if tipo == 'productos' %}
+<div class="grid-kpis">
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Productos distintos vendidos</div>
+        <div class="valor-kpi">{{ resumen_productos.cantidad_productos }}</div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Total vendido en el periodo</div>
+        <div class="valor-kpi">S/ {{ "%.2f"|format(resumen_productos.total) }}</div>
+    </div>
+</div>
+
+<div class="tarjeta">
+    <table class="tabla" id="tabla-reporte-productos" data-paginacion="10">
+        <thead>
+            <tr><th>#</th><th>Producto</th><th>Categoría</th><th>Cantidad vendida</th><th>Total vendido</th></tr>
+        </thead>
+        <tbody>
+            {% for fila in productos %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ fila.producto }}</td>
+                <td>{{ fila.categoria }}</td>
+                <td>{{ fila.cantidad }}</td>
+                <td>S/ {{ "%.2f"|format(fila.total) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="sin-resultados">No hay ventas registradas en este periodo.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% else %}
+<div class="grid-kpis">
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Ventas del periodo</div>
+        <div class="valor-kpi">{{ resumen_ventas.cantidad }}</div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Total del periodo</div>
+        <div class="valor-kpi">S/ {{ "%.2f"|format(resumen_ventas.total) }}</div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Al contado</div>
+        <div class="valor-kpi">S/ {{ "%.2f"|format(resumen_ventas.contado) }}</div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">A crédito</div>
+        <div class="valor-kpi">S/ {{ "%.2f"|format(resumen_ventas.credito) }}</div>
+    </div>
+</div>
+
+<div class="tarjeta">
+    <table class="tabla" id="tabla-reporte-ventas" data-paginacion="10">
+        <thead>
+            <tr>
+                <th>N° Operación</th><th>Fecha</th><th>Cliente</th>
+                {% if not id_sede %}<th>Sede</th>{% endif %}
+                <th>Tipo</th><th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for venta in ventas %}
+            <tr>
+                <td>{{ venta.numero_operacion }}</td>
+                <td>{{ venta.fecha_hora.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>{{ venta.cliente.nombre_cliente }}</td>
+                {% if not id_sede %}<td>{{ venta.sede.nombre_sede }}</td>{% endif %}
+                <td>
+                    <span class="etiqueta {{ 'etiqueta-credito' if venta.es_credito else 'etiqueta-contado' }}">
+                        {{ 'Crédito' if venta.es_credito else 'Contado' }}
+                    </span>
+                </td>
+                <td>S/ {{ "%.2f"|format(venta.total) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="sin-resultados">No hay ventas registradas en este periodo.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/paginacion.js') }}"></script>
+{% endblock %}

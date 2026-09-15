@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block titulo %}{{ 'Editar' if cliente else 'Nuevo' }} cliente — Agrofalma{% endblock %}
+
+{% block contenido %}
+{% set pestana_activa = 'clientes' %}
+{% include "ventas/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h1>{{ 'Editar cliente' if cliente else 'Nuevo cliente' }}</h1>
+</div>
+
+<div class="tarjeta tarjeta-formulario">
+    <form method="POST">
+        {% set v = valores if valores is not none else cliente %}
+
+        <label for="nombre_cliente">Nombre o razón social</label>
+        <input type="text" id="nombre_cliente" name="nombre_cliente" required
+               value="{{ v.nombre_cliente if v else '' }}" placeholder="Ej. Fundo Los Álamos">
+
+        <div class="fila-formulario">
+            <div>
+                <label for="documento">Documento (opcional)</label>
+                <input type="text" id="documento" name="documento"
+                       value="{{ v.documento if v and v.documento else '' }}" placeholder="DNI / RUC">
+            </div>
+            <div>
+                <label for="telefono">Teléfono (opcional)</label>
+                <input type="text" id="telefono" name="telefono"
+                       value="{{ v.telefono if v and v.telefono else '' }}">
+            </div>
+        </div>
+
+        <div class="acciones-formulario">
+            <a href="{{ url_for('ventas.listar_clientes') }}" class="boton-secundario">Cancelar</a>
+            <button type="submit" class="boton-primario">Guardar</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

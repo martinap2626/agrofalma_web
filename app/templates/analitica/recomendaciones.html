@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block titulo %}Recomendaciones de abastecimiento — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Analítica comercial</h1>
+</div>
+{% include "analitica/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h2>Recomendaciones de abastecimiento</h2>
+    <div class="acciones-cabecera">
+        <a href="{{ url_for('analitica.recomendaciones') }}"
+           class="boton-secundario {% if not filtro_urgencia %}activo{% endif %}">Todas</a>
+        <a href="{{ url_for('analitica.recomendaciones', urgencia='urgente') }}"
+           class="boton-secundario {% if filtro_urgencia == 'urgente' %}activo{% endif %}">Urgente</a>
+        <a href="{{ url_for('analitica.recomendaciones', urgencia='media') }}"
+           class="boton-secundario {% if filtro_urgencia == 'media' %}activo{% endif %}">Media</a>
+        <a href="{{ url_for('analitica.recomendaciones', urgencia='sin_accion') }}"
+           class="boton-secundario {% if filtro_urgencia == 'sin_accion' %}activo{% endif %}">Sin acción</a>
+    </div>
+</div>
+
+<div class="tarjeta">
+    {% if recomendaciones %}
+    <table class="tabla" id="tabla-recomendaciones" data-paginacion="10">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Sede</th>
+                <th>Urgencia</th>
+                <th>Stock actual</th>
+                <th>Demanda prevista</th>
+                <th>Cantidad sugerida</th>
+                <th>Por qué</th>
+                <th>Calculado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in recomendaciones %}
+            <tr>
+                <td>{{ r.producto.nombre_producto }}</td>
+                <td>{{ r.sede.nombre_sede }}</td>
+                <td>
+                    {% if r.nivel_urgencia == 'urgente' %}
+                    <span class="etiqueta etiqueta-alerta">Urgente</span>
+                    {% elif r.nivel_urgencia == 'media' %}
+                    <span class="etiqueta etiqueta-pendiente">Media</span>
+                    {% else %}
+                    <span class="etiqueta etiqueta-inactivo">Sin acción</span>
+                    {% endif %}
+                </td>
+                <td>{{ r.stock_actual }}</td>
+                <td>{{ "%.2f"|format(r.demanda_prevista) }}</td>
+                <td>{{ r.cantidad_sugerida }}</td>
+                <td>{{ r.motivo or '—' }}</td>
+                <td>{{ r.fecha_generacion.strftime('%d/%m/%Y') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="sin-resultados">No hay recomendaciones{{ ' con ese nivel de urgencia' if filtro_urgencia else '' }} por ahora.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/paginacion.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block titulo %}Clientes — Agrofalma{% endblock %}
+
+{% block contenido %}
+{% set pestana_activa = 'clientes' %}
+{% include "ventas/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h1>Clientes</h1>
+    <div class="acciones-cabecera">
+        <input type="text" id="buscador" class="buscador" data-buscador="tabla-clientes"
+               placeholder="Buscar cliente..." value="{{ busqueda }}"
+               aria-label="Buscar cliente por nombre">
+        <a href="{{ url_for('ventas.nuevo_cliente') }}" class="boton-primario">+ Nuevo cliente</a>
+    </div>
+</div>
+
+<div class="tarjeta">
+    <table class="tabla" id="tabla-clientes">
+        <thead>
+            <tr>
+                <th>Cliente</th>
+                <th>Documento</th>
+                <th>Teléfono</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cliente in clientes %}
+            <tr data-filtro="{{ cliente.nombre_cliente|lower }}">
+                <td>{{ cliente.nombre_cliente }}</td>
+                <td>{{ cliente.documento or '—' }}</td>
+                <td>{{ cliente.telefono or '—' }}</td>
+                <td>
+                    {% if cliente.estado %}
+                    <span class="etiqueta etiqueta-activo">Activo</span>
+                    {% else %}
+                    <span class="etiqueta etiqueta-inactivo">Inactivo</span>
+                    {% endif %}
+                </td>
+                <td class="celda-acciones">
+                    <a href="{{ url_for('ventas.editar_cliente', id_cliente=cliente.id_cliente) }}"
+                       class="icono-accion" title="Editar">✏️</a>
+                    {% if cliente.estado %}
+                    <form method="POST" action="{{ url_for('ventas.desactivar_cliente', id_cliente=cliente.id_cliente) }}"
+                          onsubmit="return confirm('¿Desactivar {{ cliente.nombre_cliente }}?');" style="display:inline">
+                        <button type="submit" class="icono-accion" title="Desactivar">🗑️</button>
+                    </form>
+                    {% else %}
+                    <form method="POST" action="{{ url_for('ventas.reactivar_cliente', id_cliente=cliente.id_cliente) }}"
+                          onsubmit="return confirm('¿Reactivar {{ cliente.nombre_cliente }}?');" style="display:inline">
+                        <button type="submit" class="icono-accion" title="Reactivar">♻️</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" class="sin-resultados">No se encontraron clientes.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/buscador.js') }}"></script>
+{% endblock %}

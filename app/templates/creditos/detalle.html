@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block titulo %}Crédito {{ credito.venta.numero_operacion }} — Agrofalma{% endblock %}
+
+{% block contenido %}
+{% set pestana_activa = 'creditos' %}
+{% include "ventas/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h1>Crédito de la venta {{ credito.venta.numero_operacion }}</h1>
+    <a href="{{ url_for('ventas.listar_creditos') }}" class="boton-secundario">Volver al listado</a>
+</div>
+
+<div class="tarjeta" style="margin-bottom:18px">
+    <div class="fila-formulario">
+        <div><strong>Cliente:</strong> {{ credito.venta.cliente.nombre_cliente }}</div>
+        <div><strong>Fecha del crédito:</strong> {{ credito.fecha_credito.strftime('%d/%m/%Y') }}</div>
+    </div>
+    <div class="fila-formulario">
+        <div><strong>Monto original:</strong> S/ {{ "%.2f"|format(credito.monto_credito) }}</div>
+        <div><strong>Saldo pendiente:</strong> S/ {{ "%.2f"|format(credito.saldo_pendiente) }}</div>
+    </div>
+    <div>
+        <strong>Estado:</strong>
+        {% if credito.estado_visual == 'pagado' %}
+        <span class="etiqueta etiqueta-activo">Pagado</span>
+        {% elif credito.estado_visual == 'parcial' %}
+        <span class="etiqueta etiqueta-parcial">Parcial</span>
+        {% else %}
+        <span class="etiqueta etiqueta-pendiente">Pendiente</span>
+        {% endif %}
+    </div>
+</div>
+
+{% if credito.estado != 'pagado' %}
+<div class="tarjeta tarjeta-formulario" style="margin-bottom:18px">
+    <h2 style="font-size:16px;margin-top:0">Registrar pago</h2>
+    <form method="POST" action="{{ url_for('ventas.registrar_pago', id_credito=credito.id_credito) }}">
+        <label for="monto_recuperado">Monto a registrar (S/)</label>
+        <input type="number" step="0.01" min="0.01" max="{{ credito.saldo_pendiente }}"
+               id="monto_recuperado" name="monto_recuperado" required>
+        <div class="acciones-formulario">
+            <button type="submit" class="boton-primario">Registrar pago</button>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<div class="tarjeta">
+    <h2 style="font-size:16px;margin-top:0">Historial de pagos</h2>
+    <table class="tabla">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Monto</th>
+                <th>Registrado por</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pago in credito.recuperaciones|sort(attribute='fecha_recuperacion', reverse=True) %}
+            <tr>
+                <td>{{ pago.fecha_recuperacion.strftime('%d/%m/%Y') }}</td>
+                <td>S/ {{ "%.2f"|format(pago.monto_recuperado) }}</td>
+                <td>{{ pago.usuario.nombre_completo }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3" class="sin-resultados">Aún no se ha registrado ningún pago.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

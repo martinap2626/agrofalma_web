@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block titulo %}Ventas — Agrofalma{% endblock %}
+
+{% block contenido %}
+{% set pestana_activa = 'ventas' %}
+{% include "ventas/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h1>Ventas consolidadas</h1>
+    <div class="acciones-cabecera">
+        <input type="text" id="buscador" class="buscador" data-buscador="tabla-ventas"
+               placeholder="Buscar por cliente o N° operación..." value="{{ busqueda }}"
+               aria-label="Buscar venta">
+        <a href="{{ url_for('ventas.nueva') }}" class="boton-primario">+ Nueva venta</a>
+    </div>
+</div>
+
+<form method="GET" class="tarjeta" style="margin-bottom:18px">
+    <input type="hidden" name="q" value="{{ busqueda }}">
+    <div class="fila-formulario">
+        <div>
+            <label for="desde">Desde</label>
+            <input type="date" id="desde" name="desde" value="{{ desde.isoformat() if desde else '' }}">
+        </div>
+        <div>
+            <label for="hasta">Hasta</label>
+            <input type="date" id="hasta" name="hasta" value="{{ hasta.isoformat() if hasta else '' }}">
+        </div>
+        <div>
+            <label for="id_trabajador">Trabajador</label>
+            <select id="id_trabajador" name="id_trabajador">
+                <option value="">Todos</option>
+                {% for t in trabajadores %}
+                <option value="{{ t.id_usuario }}" {% if id_trabajador == t.id_usuario %}selected{% endif %}>
+                    {{ t.nombre_completo }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="id_categoria">Categoría</label>
+            <select id="id_categoria" name="id_categoria">
+                <option value="">Todas</option>
+                {% for c in categorias %}
+                <option value="{{ c.id_categoria }}" {% if id_categoria == c.id_categoria %}selected{% endif %}>
+                    {{ c.nombre_categoria }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="id_sede">Sede</label>
+            <select id="id_sede" name="id_sede">
+                <option value="">Todas</option>
+                {% for s in sedes %}
+                <option value="{{ s.id_sede }}" {% if id_sede == s.id_sede %}selected{% endif %}>
+                    {{ s.nombre_sede }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="flex:0; align-self:flex-end">
+            <button type="submit" class="boton-secundario">Filtrar</button>
+        </div>
+    </div>
+</form>
+
+<div class="tarjeta">
+    <table class="tabla" id="tabla-ventas" data-paginacion="10">
+        <thead>
+            <tr>
+                <th>N° Operación</th>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Sede</th>
+                <th>Trabajador</th>
+                <th>Tipo</th>
+                <th>Estado de pago</th>
+                <th>Total</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for venta in ventas %}
+            <tr data-filtro="{{ (venta.numero_operacion ~ ' ' ~ venta.cliente.nombre_cliente)|lower }}">
+                <td>{{ venta.numero_operacion }}</td>
+                <td>{{ venta.fecha_hora.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>{{ venta.cliente.nombre_cliente }}</td>
+                <td>{{ venta.sede.nombre_sede }}</td>
+                <td>{{ venta.usuario.nombre_completo }}</td>
+                <td>
+                    <span class="etiqueta {{ 'etiqueta-credito' if venta.es_credito else 'etiqueta-contado' }}">
+                        {{ 'Crédito' if venta.es_credito else 'Contado' }}
+                    </span>
+                </td>
+                <td>
+                    <span class="etiqueta {{ 'etiqueta-activo' if venta.estado_pago == 'pagado' else 'etiqueta-pendiente' }}">
+                        {{ 'Pagado' if venta.estado_pago == 'pagado' else 'Pendiente' }}
+                    </span>
+                </td>
+                <td>S/ {{ "%.2f"|format(venta.total) }}</td>
+                <td class="celda-acciones">
+                    <a href="{{ url_for('ventas.detalle', id_venta=venta.id_venta) }}" class="icono-accion" title="Ver detalle">🔍</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="9" class="sin-resultados">No se encontraron ventas.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/buscador.js') }}"></script>
+<script src="{{ url_for('static', filename='js/paginacion.js') }}"></script>
+{% endblock %}

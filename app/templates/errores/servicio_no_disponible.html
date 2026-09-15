@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Servicio no disponible — Agrofalma y Consultores EIRL</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="pagina-login">
+    <div class="tarjeta tarjeta-error tarjeta-servicio-caido">
+        <div class="icono-servicio-caido">🌱</div>
+        <h1>No pudimos conectarnos con la base de datos</h1>
+        <p>
+            Estamos teniendo problemas para acceder a la información en este momento.
+            Por favor, espera unos minutos e inténtalo de nuevo.
+        </p>
+        <p class="login-subtitulo">
+            Si el problema continúa, comunícate con el área de soporte técnico.
+        </p>
+        <a href="{{ request.path }}" class="boton-primario">Reintentar</a>
+    </div>
+</body>
+</html>

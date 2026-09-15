@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block titulo %}Usuarios — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Usuarios</h1>
+    <div class="acciones-cabecera">
+        <input type="text" id="buscador" class="buscador" data-buscador="tabla-usuarios"
+               placeholder="Buscar usuario..." value="{{ busqueda }}"
+               aria-label="Buscar usuario">
+        <a href="{{ url_for('usuarios.nuevo') }}" class="boton-primario">+ Nuevo usuario</a>
+    </div>
+</div>
+
+<div class="tarjeta">
+    <table class="tabla" id="tabla-usuarios" data-paginacion="10">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Usuario</th>
+                <th>Correo</th>
+                <th>Rol</th>
+                <th>Sede</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for usuario in usuarios %}
+            <tr data-filtro="{{ (usuario.nombre_completo ~ ' ' ~ usuario.usuario_login)|lower }}">
+                <td>{{ usuario.nombre_completo }}</td>
+                <td>{{ usuario.usuario_login }}</td>
+                <td>{{ usuario.correo or '—' }}</td>
+                <td>{{ usuario.rol.nombre_rol }}</td>
+                <td>{{ usuario.sede.nombre_sede }}</td>
+                <td>
+                    {% if usuario.estado %}
+                    <span class="etiqueta etiqueta-activo">Activo</span>
+                    {% else %}
+                    <span class="etiqueta etiqueta-inactivo">Inactivo</span>
+                    {% endif %}
+                </td>
+                <td class="celda-acciones">
+                    <a href="{{ url_for('usuarios.editar', id_usuario=usuario.id_usuario) }}"
+                       class="icono-accion" title="Editar">✏️</a>
+                    {% if usuario.id_usuario != current_user.id_usuario %}
+                        {% if usuario.estado %}
+                        <form method="POST" action="{{ url_for('usuarios.desactivar', id_usuario=usuario.id_usuario) }}"
+                              onsubmit="return confirm('¿Desactivar a {{ usuario.nombre_completo }}?');" style="display:inline">
+                            <button type="submit" class="icono-accion" title="Desactivar">🗑️</button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="{{ url_for('usuarios.reactivar', id_usuario=usuario.id_usuario) }}"
+                              onsubmit="return confirm('¿Reactivar a {{ usuario.nombre_completo }}?');" style="display:inline">
+                            <button type="submit" class="icono-accion" title="Reactivar">♻️</button>
+                        </form>
+                        {% endif %}
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" class="sin-resultados">No se encontraron usuarios.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/buscador.js') }}"></script>
+<script src="{{ url_for('static', filename='js/paginacion.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block titulo %}Predicción de demanda — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Analítica comercial</h1>
+</div>
+{% include "analitica/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h2>Predicción de demanda</h2>
+</div>
+
+<div class="tarjeta">
+    {% if predicciones %}
+    <table class="tabla" id="tabla-prediccion" data-paginacion="10">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Categoría</th>
+                <th>Horizonte</th>
+                <th>Demanda estimada</th>
+                <th>Tendencia</th>
+                <th>Precisión (MAPE)</th>
+                <th>Calculado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in predicciones %}
+            {% set meses = (p.horizonte_semanas / 4) | round | int %}
+            <tr>
+                <td>{{ p.producto.nombre_producto }}</td>
+                <td>{{ p.producto.categoria.nombre_categoria }}</td>
+                <td>{{ meses }} {{ 'mes' if meses == 1 else 'meses' }}</td>
+                <td>{{ "%.2f"|format(p.demanda_estimada) }}</td>
+                <td>
+                    {% if p.tendencia_pct is none %}
+                    <span class="etiqueta etiqueta-inactivo">Sin dato</span>
+                    {% elif p.tendencia_pct > 0 %}
+                    <span class="etiqueta etiqueta-activo">▲ {{ "%.1f"|format(p.tendencia_pct) }}%</span>
+                    {% elif p.tendencia_pct < 0 %}
+                    <span class="etiqueta etiqueta-alerta">▼ {{ "%.1f"|format(p.tendencia_pct|abs) }}%</span>
+                    {% else %}
+                    <span class="etiqueta etiqueta-inactivo">Estable</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if p.mape is none %}
+                    <span class="etiqueta etiqueta-pendiente">Pendiente</span>
+                    {% elif p.mape <= 15 %}
+                    <span class="etiqueta etiqueta-activo">{{ "%.2f"|format(p.mape) }}%</span>
+                    {% else %}
+                    <span class="etiqueta etiqueta-alerta">{{ "%.2f"|format(p.mape) }}%</span>
+                    {% endif %}
+                </td>
+                <td>{{ p.fecha_generacion.strftime('%d/%m/%Y') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="sin-resultados">No hay predicciones de demanda por ahora.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/paginacion.js') }}"></script>
+{% endblock %}

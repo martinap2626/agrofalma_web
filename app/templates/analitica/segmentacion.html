@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block titulo %}Segmentación ABC — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Analítica comercial</h1>
+</div>
+{% include "analitica/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h2>Segmentación ABC de productos</h2>
+    <div class="acciones-cabecera">
+        <a href="{{ url_for('analitica.segmentacion') }}"
+           class="boton-secundario {% if not filtro_clase %}activo{% endif %}">Todas</a>
+        <a href="{{ url_for('analitica.segmentacion', clase='A') }}"
+           class="boton-secundario {% if filtro_clase == 'A' %}activo{% endif %}">Clase A</a>
+        <a href="{{ url_for('analitica.segmentacion', clase='B') }}"
+           class="boton-secundario {% if filtro_clase == 'B' %}activo{% endif %}">Clase B</a>
+        <a href="{{ url_for('analitica.segmentacion', clase='C') }}"
+           class="boton-secundario {% if filtro_clase == 'C' %}activo{% endif %}">Clase C</a>
+    </div>
+</div>
+
+<div class="tarjeta">
+    {% if segmentaciones %}
+    <table class="tabla" id="tabla-segmentacion" data-paginacion="10">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Categoría</th>
+                <th>Periodo</th>
+                <th>Ventas del periodo</th>
+                <th>% acumulado</th>
+                <th>Clase</th>
+                <th>Calculado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in segmentaciones %}
+            <tr>
+                <td>{{ s.producto.nombre_producto }}</td>
+                <td>{{ s.producto.categoria.nombre_categoria }}</td>
+                <td>{{ s.periodo_inicio.strftime('%m/%Y') }} – {{ s.periodo_fin.strftime('%m/%Y') }}</td>
+                <td>S/ {{ "%.2f"|format(s.ventas_periodo) }}</td>
+                <td>{{ "%.2f"|format(s.pct_acumulado) }}%</td>
+                <td>
+                    {% if s.clase_abc == 'A' %}
+                    <span class="etiqueta etiqueta-activo">A</span>
+                    {% elif s.clase_abc == 'B' %}
+                    <span class="etiqueta etiqueta-pendiente">B</span>
+                    {% else %}
+                    <span class="etiqueta etiqueta-inactivo">C</span>
+                    {% endif %}
+                </td>
+                <td>{{ s.fecha_generacion.strftime('%d/%m/%Y') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="sin-resultados">No hay segmentación{{ ' de esa clase' if filtro_clase else '' }} por ahora.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/paginacion.js') }}"></script>
+{% endblock %}

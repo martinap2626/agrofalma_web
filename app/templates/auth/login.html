@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar sesión — Agrofalma y Consultores EIRL</title>
+    <link rel="icon" href="{{ url_for('static', filename='img/logo_agrofalma.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="pagina-login">
+    <div class="login-tarjeta">
+        <div class="login-panel-marca">
+            <img src="{{ url_for('static', filename='img/logo_agrofalma.png') }}"
+                 alt="Agrofalma y Consultores EIRL" class="marca-logo-grande">
+            <p class="login-eyebrow">TU MEJOR ELECCIÓN</p>
+            <h1>Soluciones especializadas para cultivos industriales y de exportación.</h1>
+            <p class="login-descripcion">
+                Consultoría, fabricación y venta para Vid, Palta, Arándanos, Espárrago,
+                Banano, Cebolla y Pimientos.
+            </p>
+            <p class="login-ubicacion">📍 Chiclayo · Lambayeque, Perú</p>
+        </div>
+
+        <div class="login-panel-form">
+            <h2>Iniciar sesión</h2>
+            <p class="login-subtitulo">Ingresa tus credenciales para continuar</p>
+
+            {% with mensajes = get_flashed_messages(with_categories=true) %}
+                {% if mensajes %}
+                    <div class="mensajes">
+                        {% for categoria, mensaje in mensajes %}
+                            <div class="alerta alerta-{{ categoria }}">{{ mensaje }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('auth.login') }}" autocomplete="off">
+                <label for="usuario">Usuario</label>
+                <input type="text" id="usuario" name="usuario" placeholder="Ingrese su usuario"
+                       autofocus required>
+
+                <label for="contrasena">Contraseña</label>
+                {% with id = "contrasena", name = "contrasena", placeholder = "Ingrese su contraseña", required = true %}
+                {% include "_campo_contrasena.html" %}
+                {% endwith %}
+
+                <button type="submit" class="boton-primario boton-ancho">Ingresar</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/ojito-contrasena.js') }}"></script>
+</body>
+</html>

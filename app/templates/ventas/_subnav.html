@@ -1,0 +1,6 @@
+<div class="subnav-tabs">
+    <a href="{{ url_for('ventas.listar') }}" class="{% if pestana_activa == 'ventas' %}activo{% endif %}">Ventas consolidadas</a>
+    <a href="{{ url_for('ventas.mis_ventas') }}" class="{% if pestana_activa == 'mis_ventas' %}activo{% endif %}">Mis ventas del día</a>
+    <a href="{{ url_for('ventas.listar_clientes') }}" class="{% if pestana_activa == 'clientes' %}activo{% endif %}">Clientes</a>
+    <a href="{{ url_for('ventas.listar_creditos') }}" class="{% if pestana_activa == 'creditos' %}activo{% endif %}">Créditos y cobros</a>
+</div>

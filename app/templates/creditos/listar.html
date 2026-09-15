@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block titulo %}Créditos y cobros — Agrofalma{% endblock %}
+
+{% block contenido %}
+{% set pestana_activa = 'creditos' %}
+{% include "ventas/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h1>Créditos y cobros</h1>
+    <div class="acciones-cabecera">
+        <a href="{{ url_for('ventas.listar_creditos') }}"
+           class="boton-secundario {% if not filtro_estado %}activo{% endif %}">Todos</a>
+        <a href="{{ url_for('ventas.listar_creditos', estado='pendiente') }}"
+           class="boton-secundario {% if filtro_estado == 'pendiente' %}activo{% endif %}">Pendientes</a>
+        <a href="{{ url_for('ventas.listar_creditos', estado='pagado') }}"
+           class="boton-secundario {% if filtro_estado == 'pagado' %}activo{% endif %}">Pagados</a>
+    </div>
+</div>
+
+<div class="tarjeta">
+    <table class="tabla">
+        <thead>
+            <tr>
+                <th>Venta</th>
+                <th>Cliente</th>
+                <th>Fecha</th>
+                <th>Monto</th>
+                <th>Saldo pendiente</th>
+                <th>Estado</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for credito in creditos %}
+            <tr>
+                <td>{{ credito.venta.numero_operacion }}</td>
+                <td>{{ credito.venta.cliente.nombre_cliente }}</td>
+                <td>{{ credito.fecha_credito.strftime('%d/%m/%Y') }}</td>
+                <td>S/ {{ "%.2f"|format(credito.monto_credito) }}</td>
+                <td>S/ {{ "%.2f"|format(credito.saldo_pendiente) }}</td>
+                <td>
+                    {% if credito.estado_visual == 'pagado' %}
+                    <span class="etiqueta etiqueta-activo">Pagado</span>
+                    {% elif credito.estado_visual == 'parcial' %}
+                    <span class="etiqueta etiqueta-parcial">Parcial</span>
+                    {% else %}
+                    <span class="etiqueta etiqueta-pendiente">Pendiente</span>
+                    {% endif %}
+                </td>
+                <td class="celda-acciones">
+                    <a href="{{ url_for('ventas.detalle_credito', id_credito=credito.id_credito) }}"
+                       class="icono-accion" title="Ver">🔍</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" class="sin-resultados">No se encontraron créditos.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

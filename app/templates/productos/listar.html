@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block titulo %}Productos — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Productos</h1>
+    <div class="acciones-cabecera">
+        <input type="text" id="buscador" class="buscador" data-buscador="tabla-productos"
+               placeholder="Buscar producto..." value="{{ busqueda }}"
+               aria-label="Buscar producto por nombre">
+        {% if current_user.es_administrador %}
+        <a href="{{ url_for('productos.nuevo') }}" class="boton-primario">+ Nuevo producto</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="tarjeta">
+    <table class="tabla" id="tabla-productos" data-paginacion="10">
+        <thead>
+            <tr>
+                <th>N</th>
+                <th>Producto</th>
+                <th>Categoría</th>
+                <th>Precio</th>
+                <th>Unidad</th>
+                <th>Stock</th>
+                <th>Estado</th>
+                {% if current_user.es_administrador %}<th>Acciones</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for producto in productos %}
+            <tr data-filtro="{{ producto.nombre_producto|lower }}">
+                <td>{{ loop.index }}</td>
+                <td>{{ producto.nombre_producto }}</td>
+                <td>{{ producto.categoria.nombre_categoria }}</td>
+                <td>S/ {{ "%.2f"|format(producto.precio_unitario) }}</td>
+                <td>{{ producto.unidad.abreviatura }}</td>
+                <td class="{% if producto.stock_total == 0 %}stock-critico{% endif %}">
+                    {{ producto.stock_total }}
+                </td>
+                <td>
+                    {% if producto.estado %}
+                    <span class="etiqueta etiqueta-activo">Activo</span>
+                    {% else %}
+                    <span class="etiqueta etiqueta-inactivo">Inactivo</span>
+                    {% endif %}
+                </td>
+                {% if current_user.es_administrador %}
+                <td class="celda-acciones">
+                    <a href="{{ url_for('productos.editar', id_producto=producto.id_producto) }}"
+                       class="icono-accion" title="Editar">✏️</a>
+                    {% if producto.estado %}
+                    <form method="POST"
+                          action="{{ url_for('productos.desactivar', id_producto=producto.id_producto) }}"
+                          onsubmit="return confirm('¿Desactivar {{ producto.nombre_producto }}?');"
+                          style="display:inline">
+                        <button type="submit" class="icono-accion" title="Desactivar">🗑️</button>
+                    </form>
+                    {% else %}
+                    <form method="POST"
+                          action="{{ url_for('productos.reactivar', id_producto=producto.id_producto) }}"
+                          onsubmit="return confirm('¿Reactivar {{ producto.nombre_producto }}?');"
+                          style="display:inline">
+                        <button type="submit" class="icono-accion" title="Reactivar">♻️</button>
+                    </form>
+                    {% endif %}
+                </td>
+                {% endif %}
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="{% if current_user.es_administrador %}8{% else %}7{% endif %}" class="sin-resultados">
+                    No se encontraron productos.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/buscador.js') }}"></script>
+<script src="{{ url_for('static', filename='js/paginacion.js') }}"></script>
+{% endblock %}

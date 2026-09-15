@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}Acceso restringido{% endblock %}
+{% block contenido %}
+<div class="tarjeta tarjeta-error">
+    <h1>403 — Acceso restringido</h1>
+    <p>Tu rol actual ({{ current_user.rol.nombre_rol if current_user.is_authenticated else '—' }})
+       no tiene permiso para ver esta página.</p>
+    <a href="{{ url_for('productos.listar') }}" class="boton-primario">Volver al catálogo</a>
+</div>
+{% endblock %}

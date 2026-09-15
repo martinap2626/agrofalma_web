@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block titulo %}Nueva venta — Agrofalma{% endblock %}
+
+{% block contenido %}
+{% set pestana_activa = 'ventas' %}
+{% include "ventas/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h1>Nueva venta</h1>
+</div>
+
+<div class="tarjeta">
+    {% set v = valores if valores is not none else {} %}
+    <form method="POST">
+        <div class="fila-formulario">
+            <div>
+                <label for="id_cliente">Cliente</label>
+                <select id="id_cliente" name="id_cliente" required>
+                    <option value="">Seleccione...</option>
+                    {% for c in clientes %}
+                    <option value="{{ c.id_cliente }}" {% if v.get('id_cliente')|string == c.id_cliente|string %}selected{% endif %}>
+                        {{ c.nombre_cliente }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="tipo_venta">Tipo de venta</label>
+                <select id="tipo_venta" name="tipo_venta" required>
+                    <option value="contado" {% if v.get('tipo_venta', 'contado') == 'contado' %}selected{% endif %}>Contado</option>
+                    <option value="credito" {% if v.get('tipo_venta') == 'credito' %}selected{% endif %}>Crédito</option>
+                </select>
+            </div>
+        </div>
+
+        <label for="observaciones">Observaciones (opcional)</label>
+        <textarea id="observaciones" name="observaciones" rows="2">{{ v.get('observaciones', '') }}</textarea>
+
+        <label>Productos</label>
+        <table class="tabla tabla-lineas" id="tabla-lineas-venta">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th style="width:100px">Cantidad</th>
+                    <th style="width:130px">Precio unit. (S/)</th>
+                    <th style="width:110px">Subtotal</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <select name="id_producto[]" required>
+                            <option value="">Seleccione...</option>
+                            {% for p in productos %}
+                            <option value="{{ p.id_producto }}" data-precio="{{ p.precio_unitario }}">
+                                {{ p.nombre_producto }} (disp. {{ stock_sede.get(p.id_producto, 0) }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td><input type="number" name="cantidad[]" min="1" value="1" required></td>
+                    <td><input type="number" name="precio_unitario[]" min="0" step="0.01"></td>
+                    <td class="subtotal-linea">S/ 0.00</td>
+                    <td><button type="button" class="boton-secundario boton-quitar-linea">Quitar</button></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <template id="plantilla-linea-venta">
+            <tr>
+                <td>
+                    <select name="id_producto[]" required>
+                        <option value="">Seleccione...</option>
+                        {% for p in productos %}
+                        <option value="{{ p.id_producto }}" data-precio="{{ p.precio_unitario }}">
+                            {{ p.nombre_producto }} (disp. {{ stock_sede.get(p.id_producto, 0) }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </td>
+                <td><input type="number" name="cantidad[]" min="1" value="1" required></td>
+                <td><input type="number" name="precio_unitario[]" min="0" step="0.01"></td>
+                <td class="subtotal-linea">S/ 0.00</td>
+                <td><button type="button" class="boton-secundario boton-quitar-linea">Quitar</button></td>
+            </tr>
+        </template>
+
+        <button type="button" id="boton-agregar-linea" class="boton-secundario" style="margin-top:10px">+ Agregar línea</button>
+
+        <div id="total-venta" class="total-venta">Total: S/ 0.00</div>
+
+        <div class="acciones-formulario">
+            <a href="{{ url_for('ventas.listar') }}" class="boton-secundario">Cancelar</a>
+            <button type="submit" class="boton-primario">Registrar venta</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/ventas.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block titulo %}{{ 'Editar' if usuario else 'Nuevo' }} usuario — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>{{ 'Editar usuario' if usuario else 'Nuevo usuario' }}</h1>
+</div>
+
+<div class="tarjeta tarjeta-formulario">
+    <form method="POST">
+        {% set v = valores if valores is not none else usuario %}
+
+        <div class="fila-formulario">
+            <div>
+                <label for="nombre">Nombre</label>
+                <input type="text" id="nombre" name="nombre" required value="{{ v.nombre if v else '' }}">
+            </div>
+            <div>
+                <label for="apellido">Apellido</label>
+                <input type="text" id="apellido" name="apellido" required value="{{ v.apellido if v else '' }}">
+            </div>
+        </div>
+
+        <label for="usuario_login">Usuario de acceso</label>
+        {% if usuario %}
+        <input type="text" id="usuario_login" value="{{ usuario.usuario_login }}" disabled>
+        <p class="login-subtitulo" style="margin:4px 0 0">El usuario de acceso no se puede cambiar.</p>
+        {% else %}
+        <input type="text" id="usuario_login" name="usuario_login" required
+               value="{{ v.usuario_login if v else '' }}" placeholder="Ej. jperez">
+        {% endif %}
+
+        <label for="correo">Correo (opcional)</label>
+        <input type="email" id="correo" name="correo" value="{{ v.correo if v and v.correo else '' }}">
+
+        <div class="fila-formulario">
+            <div>
+                <label for="id_rol">Rol</label>
+                <select id="id_rol" name="id_rol" required>
+                    <option value="">Seleccione...</option>
+                    {% for r in roles %}
+                    {% set seleccionado = (v.id_rol|string == r.id_rol|string) if v and v.id_rol else false %}
+                    <option value="{{ r.id_rol }}" {% if seleccionado %}selected{% endif %}>{{ r.nombre_rol }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="id_sede">Sede</label>
+                <select id="id_sede" name="id_sede" required>
+                    <option value="">Seleccione...</option>
+                    {% for s in sedes %}
+                    {% set seleccionada = (v.id_sede|string == s.id_sede|string) if v and v.id_sede else false %}
+                    <option value="{{ s.id_sede }}" {% if seleccionada %}selected{% endif %}>{{ s.nombre_sede }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="fila-formulario">
+            <div>
+                <label for="contrasena">{{ 'Nueva contraseña (opcional)' if usuario else 'Contraseña' }}</label>
+                {% with id = "contrasena", name = "contrasena", required = (usuario is none) %}
+                {% include "_campo_contrasena.html" %}
+                {% endwith %}
+            </div>
+            <div>
+                <label for="confirmar_contrasena">Confirmar contraseña</label>
+                {% with id = "confirmar_contrasena", name = "confirmar_contrasena", required = (usuario is none) %}
+                {% include "_campo_contrasena.html" %}
+                {% endwith %}
+            </div>
+        </div>
+
+        <div class="acciones-formulario">
+            <a href="{{ url_for('usuarios.listar') }}" class="boton-secundario">Cancelar</a>
+            <button type="submit" class="boton-primario">Guardar</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/ojito-contrasena.js') }}"></script>
+{% endblock %}

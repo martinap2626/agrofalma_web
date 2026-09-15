@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block titulo %}Venta {{ venta.numero_operacion }} — Agrofalma{% endblock %}
+
+{% block contenido %}
+{% set pestana_activa = 'ventas' %}
+{% include "ventas/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h1>Venta {{ venta.numero_operacion }}</h1>
+    <a href="{{ url_for('ventas.listar') }}" class="boton-secundario">Volver al listado</a>
+</div>
+
+<div class="tarjeta" style="margin-bottom:18px">
+    <div class="fila-formulario">
+        <div><strong>Cliente:</strong> {{ venta.cliente.nombre_cliente }}</div>
+        <div><strong>Fecha:</strong> {{ venta.fecha_hora.strftime('%d/%m/%Y %H:%M') }}</div>
+    </div>
+    <div class="fila-formulario">
+        <div><strong>Vendido por:</strong> {{ venta.usuario.nombre_completo }}</div>
+        <div><strong>Sede:</strong> {{ venta.sede.nombre_sede }}</div>
+    </div>
+    <div class="fila-formulario">
+        <div>
+            <strong>Tipo:</strong>
+            <span class="etiqueta {{ 'etiqueta-credito' if venta.es_credito else 'etiqueta-contado' }}">
+                {{ 'Crédito' if venta.es_credito else 'Contado' }}
+            </span>
+        </div>
+        <div>
+            <strong>Estado de pago:</strong>
+            <span class="etiqueta {{ 'etiqueta-activo' if venta.estado_pago == 'pagado' else 'etiqueta-pendiente' }}">
+                {{ 'Pagado' if venta.estado_pago == 'pagado' else 'Pendiente' }}
+            </span>
+        </div>
+    </div>
+    {% if venta.observaciones %}
+    <div><strong>Observaciones:</strong> {{ venta.observaciones }}</div>
+    {% endif %}
+</div>
+
+<div class="tarjeta">
+    <table class="tabla">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio unit.</th>
+                <th>Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for linea in venta.detalle %}
+            <tr>
+                <td>{{ linea.producto.nombre_producto }}</td>
+                <td>{{ linea.cantidad }}</td>
+                <td>S/ {{ "%.2f"|format(linea.precio_unitario) }}</td>
+                <td>S/ {{ "%.2f"|format(linea.subtotal) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="3" style="text-align:right"><strong>Total</strong></td>
+                <td><strong>S/ {{ "%.2f"|format(venta.total) }}</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+{% if venta.credito %}
+<div class="tarjeta" style="margin-top:18px">
+    <h2 style="font-size:16px;margin-top:0">Crédito de esta venta</h2>
+    <p>
+        Saldo pendiente: <strong>S/ {{ "%.2f"|format(venta.credito.saldo_pendiente) }}</strong>
+        de S/ {{ "%.2f"|format(venta.credito.monto_credito) }}
+    </p>
+    <a href="{{ url_for('ventas.detalle_credito', id_credito=venta.credito.id_credito) }}" class="boton-primario">
+        Ver crédito y registrar pagos
+    </a>
+</div>
+{% endif %}
+{% endblock %}

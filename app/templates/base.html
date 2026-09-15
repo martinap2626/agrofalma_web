@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block titulo %}Agrofalma y Consultores EIRL{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='img/logo_agrofalma.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="marca">
+                <img src="{{ url_for('static', filename='img/logo_agrofalma.png') }}"
+                     alt="Agrofalma y Consultores EIRL" class="marca-logo">
+            </div>
+
+            <nav class="menu">
+                {% if current_user.is_authenticated and current_user.es_administrador %}
+                <a href="{{ url_for('dashboard.inicio') }}"
+                   class="menu-item {% if request.endpoint == 'dashboard.inicio' %}activo{% endif %}">
+                    <span>Dashboard</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('ventas.listar') }}"
+                   class="menu-item {% if request.blueprint == 'ventas' %}activo{% endif %}">
+                    <span>Ventas consolidadas</span>
+                </a>
+                <a href="{{ url_for('productos.listar') }}"
+                   class="menu-item {% if request.blueprint == 'productos' %}activo{% endif %}">
+                    <span>Productos</span>
+                </a>
+                {% if current_user.is_authenticated and current_user.es_administrador %}
+                <a href="{{ url_for('analitica.recomendaciones') }}"
+                   class="menu-item {% if request.blueprint == 'analitica' %}activo{% endif %}">
+                    <span>Analítica comercial</span>
+                </a>
+                <a href="{{ url_for('reportes.inicio') }}"
+                   class="menu-item {% if request.blueprint == 'reportes' %}activo{% endif %}">
+                    <span>Reportes</span>
+                </a>
+                <a href="{{ url_for('usuarios.listar') }}"
+                   class="menu-item {% if request.blueprint == 'usuarios' %}activo{% endif %}">
+                    <span>Usuarios</span>
+                </a>
+                {% endif %}
+            </nav>
+        </aside>
+
+        <div class="contenido">
+            <header class="topbar">
+                <div></div>
+                {% if current_user.is_authenticated %}
+                <div class="usuario-actual">
+                    <span class="usuario-rol">{{ current_user.rol.nombre_rol }}</span>
+                    <span class="usuario-nombre">{{ current_user.nombre_completo }}</span>
+                    <a href="{{ url_for('auth.logout') }}" class="boton-salir">Salir</a>
+                </div>
+                {% endif %}
+            </header>
+
+            <main class="pagina">
+                {% with mensajes = get_flashed_messages(with_categories=true) %}
+                    {% if mensajes %}
+                        <div class="mensajes">
+                            {% for categoria, mensaje in mensajes %}
+                                <div class="alerta alerta-{{ categoria }}">{{ mensaje }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                {% block contenido %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    {% block script_pie %}{% endblock %}
+</body>
+</html>
