@@ -21,7 +21,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.decorators import rol_requerido
 from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
 from app.extensions import db
-from app.models import RecomendacionAbastecimiento, PrediccionDemanda, SegmentacionProducto
+from app.models import (
+    RecomendacionAbastecimiento,
+    PrediccionDemanda,
+    SegmentacionProducto,
+    PrediccionDemandaPreview,
+    SegmentacionProductoPreview,
+)
 
 bp = Blueprint("analitica", __name__, url_prefix="/analitica")
 
@@ -98,7 +104,19 @@ def prediccion():
     # mayor demanda estimada primero, es la que mas le importa al gerente
     filas.sort(key=lambda p: -float(p.demanda_estimada))
 
-    return render_template("analitica/prediccion.html", predicciones=filas)
+    # vista previa con datos reales del historico (Excel), identificados por
+    # nombre de producto mientras el catalogo real no este en MySQL -- ver
+    # app/models/prediccion_demanda_preview.py. No crítica: si falla, la
+    # pantalla igual muestra la tabla principal.
+    try:
+        vista_previa = (
+            PrediccionDemandaPreview.query.order_by(PrediccionDemandaPreview.demanda_estimada.desc()).all()
+        )
+    except SQLAlchemyError as error:
+        registrar_error_conexion("listar vista previa de predicciones", error)
+        vista_previa = []
+
+    return render_template("analitica/prediccion.html", predicciones=filas, vista_previa=vista_previa)
 
 
 # pantalla de segmentacion ABC: clasificacion de productos segun su
@@ -126,6 +144,21 @@ def segmentacion():
     # orden de Pareto: de mayor a menor participacion en las ventas
     filas.sort(key=lambda s: float(s.pct_acumulado))
 
+    # vista previa con datos reales del historico (Excel) -- ver
+    # app/models/segmentacion_producto_preview.py. No critica: si falla, la
+    # pantalla igual muestra la tabla principal.
+    try:
+        consulta_preview = SegmentacionProductoPreview.query
+        if filtro_clase in ("A", "B", "C"):
+            consulta_preview = consulta_preview.filter(SegmentacionProductoPreview.clase_abc == filtro_clase)
+        vista_previa = consulta_preview.order_by(SegmentacionProductoPreview.pct_acumulado).all()
+    except SQLAlchemyError as error:
+        registrar_error_conexion("listar vista previa de segmentacion", error)
+        vista_previa = []
+
     return render_template(
-        "analitica/segmentacion.html", segmentaciones=filas, filtro_clase=filtro_clase
+        "analitica/segmentacion.html",
+        segmentaciones=filas,
+        filtro_clase=filtro_clase,
+        vista_previa=vista_previa,
     )

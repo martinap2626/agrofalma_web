@@ -62,6 +62,42 @@
     <p class="sin-resultados">No hay predicciones de demanda por ahora.</p>
     {% endif %}
 </div>
+
+<div class="cabecera-pagina">
+    <h2>Vista previa con datos reales del histórico</h2>
+    <p class="texto-ayuda">
+        Calculado con el modelo entrenado (Regresión Poisson, MAPE {{ "%.1f"|format(vista_previa[0].mape_modelo) if vista_previa else "--" }}%)
+        sobre las ventas reales registradas en Excel. Se identifica el producto por nombre porque el
+        catálogo de la base de datos todavía tiene productos de prueba, no el catálogo real del negocio —
+        esta tabla no reemplaza la de arriba, es evidencia de que el modelo real ya funciona.
+    </p>
+</div>
+<div class="tarjeta">
+    {% if vista_previa %}
+    <table class="tabla" id="tabla-prediccion-preview" data-paginacion="10">
+        <thead>
+            <tr>
+                <th>Producto (nombre del histórico)</th>
+                <th>Categoría</th>
+                <th>Periodo objetivo</th>
+                <th>Demanda estimada</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in vista_previa %}
+            <tr>
+                <td>{{ p.producto_normalizado }}</td>
+                <td>{{ p.categoria }}</td>
+                <td>{{ p.periodo_objetivo }}</td>
+                <td>{{ "%.2f"|format(p.demanda_estimada) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="sin-resultados">Vista previa no disponible por ahora.</p>
+    {% endif %}
+</div>
 {% endblock %}
 
 {% block script_pie %}

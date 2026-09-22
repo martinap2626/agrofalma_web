@@ -10,6 +10,15 @@ las tres tienen pantalla propia (HU-09/10/11), pero ninguna se llena
 desde la app: las llena un job de analítica aparte (modelo de predicción
 de demanda + segmentación ABC), que todavía no está implementado -- por
 ahora contienen datos de referencia para validar la interfaz.
+
+Nota sobre las tablas *_preview: predicciones_demanda_preview y
+segmentacion_productos_preview son nuevas (creadas por db.create_all(), no
+vienen en agrofalma_bd.sql). Identifican productos por nombre normalizado
+(texto) en vez de id_producto, mientras el catálogo real de productos no
+esté disponible en MySQL (hoy solo hay 44 productos de prueba). Las llena
+analitica_job/cargar_vista_previa_bd.py con resultados reales del job de
+analítica, y se muestran en las mismas pantallas de HU-09/10 como una
+sección aparte, claramente marcada como vista previa.
 """
 
 from app.models.rol import Rol
@@ -27,6 +36,8 @@ from app.models.recuperacion import Recuperacion
 from app.models.recomendacion_abastecimiento import RecomendacionAbastecimiento
 from app.models.prediccion_demanda import PrediccionDemanda
 from app.models.segmentacion_producto import SegmentacionProducto
+from app.models.prediccion_demanda_preview import PrediccionDemandaPreview
+from app.models.segmentacion_producto_preview import SegmentacionProductoPreview
 
 __all__ = [
     "Rol",
@@ -44,4 +55,6 @@ __all__ = [
     "RecomendacionAbastecimiento",
     "PrediccionDemanda",
     "SegmentacionProducto",
+    "PrediccionDemandaPreview",
+    "SegmentacionProductoPreview",
 ]

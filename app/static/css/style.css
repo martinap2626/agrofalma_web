@@ -100,6 +100,7 @@ a { text-decoration: none; color: inherit; }
 }
 .cabecera-pagina h1 { font-size: 20px; margin: 0; }
 .acciones-cabecera { display: flex; gap: 10px; align-items: center; }
+.texto-ayuda { font-size: 13px; color: var(--texto-secundario); margin: -8px 0 12px; max-width: 720px; }
 
 .buscador {
     padding: 8px 14px;

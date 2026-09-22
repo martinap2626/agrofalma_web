@@ -3,3 +3,9 @@ Flask-SQLAlchemy==3.1.1
 Flask-Login==0.6.3
 PyMySQL==1.1.1
 python-dotenv==1.0.1
+
+# componente analitico (Sprint 3): limpieza, modelado y persistencia del job offline
+pandas==3.0.5
+scikit-learn==1.9.1
+joblib==1.6.0
+openpyxl==3.1.5

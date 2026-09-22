@@ -6,3 +6,7 @@ __pycache__/
 instance/
 *.log
 .DS_Store
+
+# datos de negocio derivados (ventas reales) -- no se versionan en git
+analitica_job/datos_procesados/
+analitica_job/modelos/
