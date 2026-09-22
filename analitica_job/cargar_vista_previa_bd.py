@@ -22,13 +22,31 @@ Uso:
 
 from __future__ import annotations
 
+import math
+
 import joblib
 import numpy as np
 import pandas as pd
 
 from analitica_job.construir_features import campana_de, indice_mes
 from analitica_job.entrenar_modelo import COLUMNAS_CATEGORICAS, COLUMNAS_NUMERICAS
+from analitica_job.metricas import escala_naive_por_producto, mase
 from analitica_job.preparar_datos import CARPETA_SALIDA, ULTIMO_MES_REAL_2026
+
+# El administrador no conoce el MASE ni deberia tener que aprenderlo -- se
+# traduce a un badge de negocio. Umbrales propios del proyecto (no hay una
+# escala academica universal para MASE, a diferencia del MAPE/Lewis 1982 --
+# ver Documentacion_Avance80.docx, seccion 2): <0.5 el modelo le gana con
+# holgura al metodo ingenuo, 0.5-1.0 le gana con margen mas ajustado, >=1.0
+# no le gana (no deberia ocurrir con el candidato actual, pero se contempla).
+def confiabilidad_desde_mase(valor_mase: float | None) -> str:
+    if valor_mase is None:
+        return "Sin dato"
+    if valor_mase < 0.5:
+        return "Alta"
+    if valor_mase < 1.0:
+        return "Media"
+    return "Baja"
 
 
 def construir_fila_proximo_mes(dataset_completo: pd.DataFrame) -> pd.DataFrame:
@@ -51,7 +69,23 @@ def construir_fila_proximo_mes(dataset_completo: pd.DataFrame) -> pd.DataFrame:
     )
     categorias = dataset_completo.groupby("producto_normalizado")["categoria"].last().reset_index()
 
+    # recencia para el mes objetivo: meses consecutivos sin venta al final del
+    # historial conocido de cada producto (0 si el ultimo mes real tuvo venta)
+    def recencia_producto(grupo):
+        meses_sin_venta = 0
+        for venta in grupo.sort_values("mes_idx")["unidades_vendidas"]:
+            meses_sin_venta = 0 if venta > 0 else meses_sin_venta + 1
+        return meses_sin_venta
+
+    recencias = (
+        dataset_completo.groupby("producto_normalizado")
+        .apply(recencia_producto, include_groups=False)
+        .rename("recencia")
+        .reset_index()
+    )
+
     fila = lags.merge(categorias, on="producto_normalizado", how="left")
+    fila = fila.merge(recencias, on="producto_normalizado", how="left")
     fila["promedio_movil_3"] = fila[["lag_1", "lag_2", "lag_3"]].mean(axis=1)
     fila["mes_numero"] = mes_obj
     fila["campana"] = campana_de(mes_obj)
@@ -59,23 +93,50 @@ def construir_fila_proximo_mes(dataset_completo: pd.DataFrame) -> pd.DataFrame:
     return fila
 
 
-def generar_predicciones_proximo_mes() -> pd.DataFrame:
+def calcular_mase_por_clase(test: pd.DataFrame, modelo, escala: pd.Series, segmentacion: pd.DataFrame) -> dict[str, float]:
+    cols = COLUMNAS_CATEGORICAS + COLUMNAS_NUMERICAS
+    test_con_pred = test.assign(_pred=np.clip(modelo.predict(test[cols]), 0, None))
+    test_con_clase = test_con_pred.merge(
+        segmentacion[["producto_normalizado", "clase_abc"]], on="producto_normalizado", how="left"
+    )
+    test_con_clase["clase_abc"] = test_con_clase["clase_abc"].fillna("Sin clasificar")
+
+    mase_por_clase = {}
+    for clase, grupo in test_con_clase.groupby("clase_abc"):
+        valor = mase(grupo, "unidades_vendidas", "_pred", escala)
+        mase_por_clase[clase] = valor
+    return mase_por_clase
+
+
+def generar_predicciones_proximo_mes(segmentacion: pd.DataFrame) -> pd.DataFrame:
     train = pd.read_csv(CARPETA_SALIDA / "dataset_entrenamiento.csv")
     test = pd.read_csv(CARPETA_SALIDA / "dataset_prueba.csv")
     dataset_completo = pd.concat([train, test], ignore_index=True)
 
     modelo = joblib.load(CARPETA_SALIDA.parent / "modelos" / "modelo_demanda_candidato.joblib")
-    comparacion = pd.read_csv(CARPETA_SALIDA / "comparacion_modelos.csv")
-    mape_candidato = comparacion[
-        (comparacion["conjunto"] == "prueba") & (comparacion["modelo"] != "Linea base (promedio movil 3 meses)")
-    ].sort_values("MAPE_%_solo_meses_con_venta").iloc[0]["MAPE_%_solo_meses_con_venta"]
+    cols = COLUMNAS_CATEGORICAS + COLUMNAS_NUMERICAS
+
+    # MASE real del candidato actual, calculado por clase ABC sobre el conjunto
+    # de prueba (no se lee de un CSV de una comparacion anterior, que podria
+    # quedar desactualizada si el candidato cambia -- ver Documentacion_Avance80.docx).
+    escala = escala_naive_por_producto(train)
+    mase_por_clase = calcular_mase_por_clase(test, modelo, escala, segmentacion)
 
     fila = construir_fila_proximo_mes(dataset_completo)
-    cols = COLUMNAS_CATEGORICAS + COLUMNAS_NUMERICAS
-    fila["demanda_estimada"] = np.clip(modelo.predict(fila[cols]), 0, None)
-    fila["mape_modelo"] = mape_candidato
+    fila = fila.merge(segmentacion[["producto_normalizado", "clase_abc"]], on="producto_normalizado", how="left")
+    fila["clase_abc"] = fila["clase_abc"].fillna("Sin clasificar")
 
-    return fila[["producto_normalizado", "categoria", "periodo_objetivo", "demanda_estimada", "mape_modelo"]]
+    prediccion_cruda = np.clip(modelo.predict(fila[cols]), 0, None)
+    fila["cantidad_sugerida"] = [math.ceil(v) for v in prediccion_cruda]
+    fila["venta_mes_anterior"] = fila["lag_1"]
+    fila["confiabilidad"] = fila["clase_abc"].map(
+        lambda c: confiabilidad_desde_mase(mase_por_clase.get(c))
+    )
+
+    return fila[[
+        "producto_normalizado", "categoria", "clase_abc", "periodo_objetivo",
+        "cantidad_sugerida", "venta_mes_anterior", "confiabilidad",
+    ]]
 
 
 def cargar_en_bd(predicciones: pd.DataFrame, segmentacion: pd.DataFrame) -> None:
@@ -87,13 +148,16 @@ def cargar_en_bd(predicciones: pd.DataFrame, segmentacion: pd.DataFrame) -> None
     with app.app_context():
         PrediccionDemandaPreview.query.delete()
         for _, fila in predicciones.iterrows():
+            venta_anterior = fila["venta_mes_anterior"]
             db.session.add(
                 PrediccionDemandaPreview(
                     producto_normalizado=fila["producto_normalizado"],
                     categoria=fila["categoria"],
+                    clase_abc=fila["clase_abc"],
                     periodo_objetivo=fila["periodo_objetivo"],
-                    demanda_estimada=round(float(fila["demanda_estimada"]), 2),
-                    mape_modelo=round(float(fila["mape_modelo"]), 2),
+                    cantidad_sugerida=int(fila["cantidad_sugerida"]),
+                    venta_mes_anterior=round(float(venta_anterior), 2) if venta_anterior is not None else None,
+                    confiabilidad=fila["confiabilidad"],
                 )
             )
 
@@ -116,8 +180,8 @@ def cargar_en_bd(predicciones: pd.DataFrame, segmentacion: pd.DataFrame) -> None
 
 
 def main() -> None:
-    predicciones = generar_predicciones_proximo_mes()
     segmentacion = pd.read_csv(CARPETA_SALIDA / "segmentacion_abc.csv")
+    predicciones = generar_predicciones_proximo_mes(segmentacion)
     cargar_en_bd(predicciones, segmentacion)
 
 

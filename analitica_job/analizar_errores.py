@@ -6,9 +6,10 @@ criterios de éxito".
 
 Cruza las predicciones del modelo candidato sobre el conjunto de prueba real
 (jul-ago 2026) con la clase ABC de cada producto (analitica_job/segmentar_abc.py),
-para ver si el error se concentra en los productos de baja rotación (clase C)
-o está repartido parejo -- y contrasta el resultado contra la meta de éxito
-del proyecto de investigación (MAPE <= 15%).
+para ver si el error se concentra en algún segmento de rotación -- y compara
+contra dos criterios: el MAPE<=15% declarado en el proyecto de investigación
+(referencial, ver analitica_job/metricas.py sobre por qué no es ideal aquí) y
+el MASE<1 (¿le gana al método ingenuo de repetir el mes anterior?).
 
 Requiere haber corrido antes: construir_features, entrenar_modelo, segmentar_abc.
 
@@ -23,34 +24,18 @@ import numpy as np
 import pandas as pd
 
 from analitica_job.entrenar_modelo import COLUMNAS_CATEGORICAS, COLUMNAS_NUMERICAS
+from analitica_job.metricas import escala_naive_por_producto, mase, resumen_metricas
 from analitica_job.preparar_datos import CARPETA_SALIDA
 
-META_MAPE = 15.0  # criterio de exito del proyecto de investigacion
-
-
-def calcular_metricas(y_real: np.ndarray, y_pred: np.ndarray) -> dict:
-    y_real = np.asarray(y_real, dtype=float)
-    y_pred = np.clip(np.asarray(y_pred, dtype=float), a_min=0, a_max=None)
-
-    mae = float(np.mean(np.abs(y_real - y_pred)))
-    con_venta = y_real > 0
-    if con_venta.sum() > 0:
-        mape = float(np.mean(np.abs((y_real[con_venta] - y_pred[con_venta]) / y_real[con_venta])) * 100)
-    else:
-        mape = float("nan")
-
-    return {
-        "MAE": round(mae, 2),
-        "MAPE_%": round(mape, 2) if not np.isnan(mape) else None,
-        "n_meses_con_venta": int(con_venta.sum()),
-        "n_total": len(y_real),
-    }
+META_MAPE = 15.0  # criterio de exito declarado en el proyecto de investigacion (referencial)
 
 
 def main() -> None:
+    train = pd.read_csv(CARPETA_SALIDA / "dataset_entrenamiento.csv")
     test = pd.read_csv(CARPETA_SALIDA / "dataset_prueba.csv")
     segmentacion = pd.read_csv(CARPETA_SALIDA / "segmentacion_abc.csv")
     modelo = joblib.load(CARPETA_SALIDA.parent / "modelos" / "modelo_demanda_candidato.joblib")
+    escala = escala_naive_por_producto(train)
 
     cols = COLUMNAS_CATEGORICAS + COLUMNAS_NUMERICAS
     test = test.copy()
@@ -71,32 +56,31 @@ def main() -> None:
     test = test.merge(clases, on="producto_normalizado", how="left")
     test["clase_abc"] = test["clase_abc"].fillna("Sin clasificar")
 
-    print("=== Métrica global (ya reportada) ===")
-    global_m = calcular_metricas(test["unidades_vendidas"], test["prediccion"])
+    print("=== Métrica global ===")
+    global_m = resumen_metricas(test["unidades_vendidas"], test["prediccion"])
+    global_m["MASE"] = round(mase(test, "unidades_vendidas", "prediccion", escala), 3)
     print(global_m)
 
     print("\n=== Métricas por clase ABC ===")
     filas_resumen = []
     for clase, grupo in test.groupby("clase_abc"):
-        m = calcular_metricas(grupo["unidades_vendidas"], grupo["prediccion"])
+        m = resumen_metricas(grupo["unidades_vendidas"], grupo["prediccion"])
+        m_mase = mase(grupo, "unidades_vendidas", "prediccion", escala)
+        m["MASE"] = round(m_mase, 3) if m_mase is not None else None
         m["clase_abc"] = clase
         m["n_productos"] = grupo["producto_normalizado"].nunique()
         filas_resumen.append(m)
-        print(f"  Clase {clase}: MAE={m['MAE']} MAPE={m['MAPE_%']}% "
-              f"(n_meses_con_venta={m['n_meses_con_venta']}/{m['n_total']}, "
-              f"{m['n_productos']} productos)")
+        print(f"  Clase {clase}: MAE={m['MAE']} MAPE={m['MAPE_%']} WAPE={m['WAPE_%']} "
+              f"MASE={m['MASE']} ({m['n_productos']} productos)")
 
-    resumen = pd.DataFrame(filas_resumen)[
-        ["clase_abc", "n_productos", "n_meses_con_venta", "n_total", "MAE", "MAPE_%"]
-    ]
+    resumen = pd.DataFrame(filas_resumen)[["clase_abc", "n_productos", "MAE", "MAPE_%", "WAPE_%", "MASE"]]
     resumen.to_csv(CARPETA_SALIDA / "metricas_por_clase_abc.csv", index=False)
 
-    print(f"\n=== Comparación contra el criterio de éxito (MAPE <= {META_MAPE}%) ===")
+    print(f"\n=== Comparación contra los criterios ===")
     for _, fila in resumen.iterrows():
-        if fila["MAPE_%"] is None:
-            continue
-        cumple = "SI cumple" if fila["MAPE_%"] <= META_MAPE else "no cumple"
-        print(f"  Clase {fila['clase_abc']}: {fila['MAPE_%']}% -> {cumple}")
+        veredicto_mape = "SI cumple" if (fila["MAPE_%"] is not None and fila["MAPE_%"] <= META_MAPE) else "no cumple"
+        veredicto_mase = "le gana al ingenuo" if (fila["MASE"] is not None and fila["MASE"] < 1) else "pierde contra el ingenuo"
+        print(f"  Clase {fila['clase_abc']}: MAPE<=15% -> {veredicto_mape} | MASE<1 -> {veredicto_mase}")
 
     print("\n=== Top 10 casos con mayor error absoluto (peores casos) ===")
     peores_abs = test.sort_values("error_abs", ascending=False).head(10)

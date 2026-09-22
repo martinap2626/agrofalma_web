@@ -97,7 +97,27 @@ def agregar_features_temporales(panel: pd.DataFrame, categoria_por_producto: pd.
     columnas_lag = [f"lag_{i}" for i in range(1, N_LAGS + 1)] + ["promedio_movil_3"]
     panel[columnas_lag] = panel[columnas_lag].fillna(0)
 
+    panel["recencia"] = panel.groupby("producto_normalizado", group_keys=False).apply(
+        _recencia_producto, include_groups=False
+    )
+
     return panel
+
+
+# meses transcurridos desde la ultima venta real del producto, contando solo
+# meses estrictamente anteriores al actual (sin fuga de datos). El primer mes
+# de cada producto siempre tiene venta (asi se construye el panel), asi que
+# arranca en 0. Esto le da al modelo una senal que hoy no tiene: distinguir
+# "un mes malo aislado" de "este producto lleva mucho tiempo sin venderse" --
+# ambos casos se ven igual en los rezagos (lag_1=lag_2=lag_3=0).
+def _recencia_producto(grupo: pd.DataFrame) -> pd.Series:
+    grupo = grupo.sort_values("mes_idx")
+    recencias = []
+    meses_sin_venta = 0
+    for i, venta in enumerate(grupo["unidades_vendidas"]):
+        recencias.append(0 if i == 0 else meses_sin_venta)
+        meses_sin_venta = 0 if venta > 0 else meses_sin_venta + 1
+    return pd.Series(recencias, index=grupo.index)
 
 
 # Se probaron dos features adicionales (tendencia = lag_1 - lag_2, e indice
@@ -135,7 +155,7 @@ def main() -> None:
 
     columnas = [
         "producto_normalizado", "categoria", "anio", "mes_numero", "mes_idx", "campana",
-        "lag_1", "lag_2", "lag_3", "promedio_movil_3",
+        "lag_1", "lag_2", "lag_3", "promedio_movil_3", "recencia",
         "unidades_vendidas", "ventas_soles",
     ]
     panel_final = panel_final[columnas]

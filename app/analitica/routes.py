@@ -110,7 +110,7 @@ def prediccion():
     # pantalla igual muestra la tabla principal.
     try:
         vista_previa = (
-            PrediccionDemandaPreview.query.order_by(PrediccionDemandaPreview.demanda_estimada.desc()).all()
+            PrediccionDemandaPreview.query.order_by(PrediccionDemandaPreview.cantidad_sugerida.desc()).all()
         )
     except SQLAlchemyError as error:
         registrar_error_conexion("listar vista previa de predicciones", error)
