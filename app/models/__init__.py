@@ -38,8 +38,16 @@ from app.models.prediccion_demanda import PrediccionDemanda
 from app.models.segmentacion_producto import SegmentacionProducto
 from app.models.prediccion_demanda_preview import PrediccionDemandaPreview
 from app.models.segmentacion_producto_preview import SegmentacionProductoPreview
+from app.models.bitacora import Bitacora
+from app.models.ejecucion_analitica import EjecucionAnalitica
+from app.models.plan_campana import PlanCampana
+from app.models.evento_negocio import EventoNegocio
 
 __all__ = [
+    "Bitacora",
+    "EjecucionAnalitica",
+    "PlanCampana",
+    "EventoNegocio",
     "Rol",
     "Sede",
     "Usuario",

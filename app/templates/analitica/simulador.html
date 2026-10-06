@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block titulo %}Simulador de escenarios — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Analítica comercial</h1>
+</div>
+{% include "analitica/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h2>Simulador de escenarios</h2>
+</div>
+
+<details class="tarjeta explicacion" open>
+    <summary>¿Para qué sirve y cómo se calcula?</summary>
+    <p>
+        Responde preguntas del tipo <strong>«¿qué pasa si…?»</strong> antes de comprar o producir: si la demanda de un producto sube
+        un 20 % por una campaña fuerte, si la reposición tarda más días o si el stock real es distinto al registrado.
+        Compara el escenario con la recomendación normal. <strong>No cambia ni guarda nada</strong>: es solo una simulación.
+        El cambio de la demanda puedes darlo en <strong>porcentaje</strong>, en <strong>unidades a sumar o restar</strong> o como la <strong>demanda total del mes</strong>.
+    </p>
+    <ul>
+        <li><strong>Demanda del escenario</strong> = la demanda prevista del mes con el cambio que indiques (porcentaje, unidades o demanda total).</li>
+        <li><strong>Margen de seguridad:</strong> el de la recomendación normal, escalado con la demanda y con el mismo tope por clase.</li>
+        <li><strong>Debe haber disponible</strong> = demanda + lo que se vende mientras llega la reposición + margen.
+            <strong>Punto de reposición</strong> = lo que se vende mientras llega la reposición + margen.</li>
+        <li><strong>Días que alcanza el stock</strong> = stock ÷ (demanda del mes ÷ 30).</li>
+    </ul>
+</details>
+
+<form method="GET" class="tarjeta" style="margin-bottom:18px">
+    <div class="fila-formulario">
+        <div>
+            <label for="id_producto">Producto</label>
+            <select id="id_producto" name="id_producto" required>
+                <option value="">Seleccione...</option>
+                {% for r in recs %}
+                <option value="{{ r.id_producto }}" {% if form.get('id_producto') == r.id_producto %}selected{% endif %}>
+                    {{ r.producto.nombre_producto }}{% if r.clase_abc %} (clase {{ r.clase_abc }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="modo">Cómo indicar el cambio</label>
+            <select id="modo" name="modo">
+                <option value="pct" {% if form.get('modo', 'pct') == 'pct' %}selected{% endif %}>Porcentaje (%)</option>
+                <option value="unid" {% if form.get('modo') == 'unid' %}selected{% endif %}>Unidades a sumar o restar</option>
+                <option value="total" {% if form.get('modo') == 'total' %}selected{% endif %}>Demanda total del mes (unidades)</option>
+            </select>
+        </div>
+        <div>
+            <label for="cambio">Valor</label>
+            <input type="number" step="any" id="cambio" name="cambio" value="{{ form.get('cambio', 0)|round(2) }}">
+        </div>
+        <div>
+            <label for="dias">Días de reposición</label>
+            <input type="number" min="1" max="120" id="dias" name="dias" value="{{ form.get('dias', parametros.tiempo_reposicion_dias) }}">
+        </div>
+        <div>
+            <label for="stock">Stock actual (unidades)</label>
+            <input type="number" min="0" id="stock" name="stock" value="{{ form.get('stock', '') }}" placeholder="Opcional">
+        </div>
+        <div style="flex:0; align-self:flex-end"><button type="submit" class="boton-primario">Simular</button></div>
+    </div>
+</form>
+
+{% if rec and escenario %}
+<div class="tarjeta">
+    <h3 style="margin-top:0">{{ rec.producto.nombre_producto }}</h3>
+    <table class="tabla">
+        <thead><tr><th></th><th>Recomendación normal</th><th>Escenario simulado</th></tr></thead>
+        <tbody>
+            <tr><td>Demanda del mes (unidades)</td><td>{{ base.demanda|round(0)|int }}</td><td><strong>{{ escenario.demanda|round(0)|int }}</strong>
+                {% if escenario.cambio_unidades|round(0) != 0 %}<br><small>{{ '%+d'|format(escenario.cambio_unidades|round(0)|int) }} unidades{% if escenario.cambio_pct is not none %} ({{ '%+.0f'|format(escenario.cambio_pct) }} %){% endif %}</small>{% endif %}</td></tr>
+            <tr><td>Días de reposición</td><td>{{ parametros.tiempo_reposicion_dias }}</td><td><strong>{{ form.dias }}</strong></td></tr>
+            <tr><td>Margen de seguridad</td><td>{{ base.margen }}</td><td><strong>{{ escenario.margen }}</strong></td></tr>
+            <tr><td>Debe haber disponible</td><td>{{ base.objetivo }}</td><td><strong>{{ escenario.objetivo }}</strong></td></tr>
+            <tr><td>Punto de reposición</td><td>{{ base.punto_reposicion }}</td><td><strong>{{ escenario.punto_reposicion }}</strong></td></tr>
+            {% if form.stock != '' %}
+            <tr><td>Stock actual</td><td>{{ form.stock }}</td><td>{{ form.stock }}</td></tr>
+            <tr><td>Días que alcanza el stock</td><td>{{ base.dias_alcanza if base.dias_alcanza is not none else '—' }}</td><td><strong>{{ escenario.dias_alcanza if escenario.dias_alcanza is not none else '—' }}</strong></td></tr>
+            {% endif %}
+            <tr>
+                <td>Situación</td>
+                {% for e in (base, escenario) %}
+                <td>
+                    {% if e.nivel == 'urgente' %}<span class="etiqueta etiqueta-alerta">Urgente</span>
+                    {% elif e.nivel == 'media' %}<span class="etiqueta etiqueta-pendiente">Media</span>
+                    {% elif e.nivel == 'sin_accion' %}<span class="etiqueta etiqueta-inactivo">Sin acción</span>
+                    {% else %}<span class="etiqueta etiqueta-activo">Plan</span>{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            <tr><td>{% if form.stock != '' %}Cantidad a reponer{% else %}Conviene tener disponible{% endif %}</td>
+                <td>{{ base.cantidad }}</td><td><strong>{{ escenario.cantidad }}</strong></td></tr>
+        </tbody>
+    </table>
+    {% set diferencia = escenario.cantidad - base.cantidad %}
+    <p class="texto-ayuda">
+        {% if diferencia > 0 %}Con este escenario conviene reponer <strong>{{ diferencia }} unidades más</strong> que con la recomendación normal.
+        {% elif diferencia < 0 %}Con este escenario conviene reponer <strong>{{ -diferencia }} unidades menos</strong> que con la recomendación normal.
+        {% else %}Este escenario no cambia la cantidad recomendada.{% endif %}
+    </p>
+</div>
+{% elif not recs %}
+<p class="sin-resultados">Todavía no hay recomendaciones. Se generan al actualizar la analítica.</p>
+{% endif %}
+{% endblock %}

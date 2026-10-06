@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block titulo %}Plan de campaña — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Analítica comercial</h1>
+</div>
+{% include "analitica/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h2>Plan de campaña{% if resumen %}: {{ resumen.nombre }}{% endif %}</h2>
+    <div class="acciones-cabecera">
+        {% if hay_en_curso %}
+        <a href="{{ url_for('analitica.campana', tipo='en_curso', clase=filtro_clase) }}"
+           class="boton-secundario {% if tipo == 'en_curso' %}activo{% endif %}">Campaña en curso</a>
+        {% endif %}
+        <a href="{{ url_for('analitica.campana', tipo='proxima', clase=filtro_clase) }}"
+           class="boton-secundario {% if tipo == 'proxima' %}activo{% endif %}">Próxima campaña</a>
+        <a href="{{ url_for('analitica.campana', tipo=tipo) }}" class="boton-secundario {% if not filtro_clase %}activo{% endif %}">Todas</a>
+        {% for c in ('A', 'B', 'C') %}
+        <a href="{{ url_for('analitica.campana', tipo=tipo, clase=c) }}"
+           class="boton-secundario {% if filtro_clase == c %}activo{% endif %}">Clase {{ c }}</a>
+        {% endfor %}
+    </div>
+</div>
+
+{% if resumen %}
+<details class="tarjeta explicacion" open>
+    <summary>¿Qué es el plan de campaña y cómo se calcula?</summary>
+    <p>
+        La empresa decide por <strong>campaña agrícola</strong>: la <strong>campaña grande</strong> va de enero a junio y la
+        <strong>campaña chica</strong> de julio a diciembre. Esta pantalla estima <strong>cuántas unidades de cada producto se venderán
+        en la campaña completa</strong>, y te sirve para planificar las compras grandes (la pantalla de Recomendaciones, en cambio,
+        cuida la reposición del próximo mes).
+    </p>
+    <ul>
+        <li><strong>Campaña en curso:</strong> lo que ya se vendió + lo que se vendió el año pasado en los meses que faltan, corregido por el
+            <strong>ritmo</strong> de este año (cuánto va vendido frente a lo que se había vendido el año pasado en el mismo tramo).
+            Se va corrigiendo sola a medida que pasan los meses.</li>
+        <li><strong>Próxima campaña:</strong> lo vendido en esa misma campaña el año pasado, sin ajuste (todavía no hay avance).</li>
+        <li><strong>Falta vender:</strong> lo esperado menos lo ya vendido. <strong>Por conseguir:</strong> lo que falta vender menos el stock
+            actual de ese producto (si hay stock registrado).</li>
+        <li><strong>Confianza:</strong> sale de cuánto se equivocó este mismo método con la campaña más reciente ya terminada
+            ({{ resumen.campana_prueba_nombre or 'la campaña más reciente' }}):
+            {% if resumen.errores.A is not none %}clase A, ~{{ "%.0f"|format(resumen.errores.A) }}%{% endif %}{% if resumen.errores.B is not none %}; clase B, ~{{ "%.0f"|format(resumen.errores.B) }}%{% endif %}{% if resumen.errores.C is not none %}; clase C, ~{{ "%.0f"|format(resumen.errores.C) }}%{% endif %}.
+            Los productos de poco movimiento (clase C) son los menos predecibles.</li>
+    </ul>
+    <p class="texto-ayuda">
+        Hay pocas campañas de historia (3 años y medio), así que el método es simple a propósito. Es una guía para planificar, no una promesa de ventas.
+    </p>
+</details>
+
+<div class="grid-kpis">
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Esperado en la campaña <small>(unidades)</small></div>
+        <div class="valor-kpi">{{ "{:,.0f}".format(resumen.esperado_total).replace(",", " ") }}</div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Misma campaña el año pasado</div>
+        <div class="valor-kpi">{{ "{:,.0f}".format(resumen.referencia).replace(",", " ") }}</div>
+        {% if resumen.variacion_pct is not none and tipo == 'en_curso' %}
+        <div class="etiqueta-kpi"><small>Hoy se espera un {{ "%.0f"|format(resumen.variacion_pct|abs) }}% {{ 'menos' if resumen.variacion_pct < 0 else 'más' }} que el año pasado</small></div>
+        {% endif %}
+    </div>
+    {% if tipo == 'en_curso' %}
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Vendido hasta ahora <small>({{ resumen.meses_conocidos }} de 6 meses)</small></div>
+        <div class="valor-kpi">{{ "{:,.0f}".format(resumen.vendido).replace(",", " ") }}</div>
+        <div class="etiqueta-kpi"><small>{{ "%.0f"|format(resumen.avance_pct) }}% de lo esperado</small></div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Ritmo frente al año pasado</div>
+        <div class="valor-kpi">{{ "%.0f"|format(resumen.ritmo_pct) if resumen.ritmo_pct is not none else '—' }}%</div>
+        <div class="etiqueta-kpi"><small>{{ 'va por debajo' if resumen.ritmo_pct is not none and resumen.ritmo_pct < 95 else ('va por encima' if resumen.ritmo_pct is not none and resumen.ritmo_pct > 105 else 'va parecido') }}</small></div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="tarjeta" style="margin-bottom:16px">
+    <table class="tabla">
+        <thead><tr><th>Clase</th><th>Productos</th><th>Esperado en la campaña (unidades)</th></tr></thead>
+        <tbody>
+            {% for c, d in resumen.por_clase.items() %}
+            <tr>
+                <td>{% if c == 'A' %}<span class="etiqueta etiqueta-activo">A</span>{% elif c == 'B' %}<span class="etiqueta etiqueta-pendiente">B</span>{% else %}<span class="etiqueta etiqueta-inactivo">C</span>{% endif %}</td>
+                <td>{{ d.n }}</td>
+                <td>{{ "{:,.0f}".format(d.esperado).replace(",", " ") }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div class="tarjeta">
+    {% if filas %}
+    <table class="tabla" id="tabla-campana" data-paginacion="15">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Clase</th>
+                <th>Año pasado</th>
+                {% if tipo == 'en_curso' %}<th>Vendido hasta ahora</th>{% endif %}
+                <th>Esperado en la campaña</th>
+                {% if tipo == 'en_curso' %}<th>Falta vender</th><th>Ritmo</th>{% endif %}
+                <th>Stock actual</th>
+                <th>Por conseguir</th>
+                <th>Confianza</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in filas %}
+            <tr>
+                <td>{{ f.producto.nombre_producto }}</td>
+                <td>
+                    {% if f.clase_abc == 'A' %}<span class="etiqueta etiqueta-activo">A</span>
+                    {% elif f.clase_abc == 'B' %}<span class="etiqueta etiqueta-pendiente">B</span>
+                    {% else %}<span class="etiqueta etiqueta-inactivo">C</span>{% endif %}
+                </td>
+                <td>{{ f.referencia_anio_anterior|round(0)|int }}</td>
+                {% if tipo == 'en_curso' %}<td>{{ f.vendido|round(0)|int }}</td>{% endif %}
+                <td><strong>{{ f.esperado_total|round(0)|int }}</strong></td>
+                {% if tipo == 'en_curso' %}
+                <td>{{ f.esperado_resto|round(0)|int }}</td>
+                <td>
+                    {% if f.ritmo_pct is none %}<span class="etiqueta etiqueta-inactivo">Sin dato</span>
+                    {% elif f.ritmo_pct >= 105 %}<span class="etiqueta etiqueta-activo">▲ {{ "%.0f"|format(f.ritmo_pct) }}%</span>
+                    {% elif f.ritmo_pct <= 95 %}<span class="etiqueta etiqueta-alerta">▼ {{ "%.0f"|format(f.ritmo_pct) }}%</span>
+                    {% else %}<span class="etiqueta etiqueta-inactivo">≈ {{ "%.0f"|format(f.ritmo_pct) }}%</span>{% endif %}
+                </td>
+                {% endif %}
+                <td>{{ f.stock_actual if f.stock_actual is not none else '—' }}</td>
+                <td>{% if f.por_cubrir is none %}—{% elif f.por_cubrir == 0 %}<span class="etiqueta etiqueta-activo">Cubierto</span>{% else %}<strong>{{ f.por_cubrir }}</strong>{% endif %}</td>
+                <td>
+                    {% if f.confianza == 'Alta' %}<span class="etiqueta etiqueta-activo">Alta</span>
+                    {% elif f.confianza == 'Media' %}<span class="etiqueta etiqueta-pendiente">Media</span>
+                    {% else %}<span class="etiqueta etiqueta-alerta">Baja</span>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="sin-resultados">Todavía no hay un plan de campaña. Se genera al actualizar la analítica.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/paginacion.js') }}"></script>
+{% endblock %}

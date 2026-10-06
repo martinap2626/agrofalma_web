@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block titulo %}Auditoría — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Auditoría de acciones</h1>
+</div>
+
+<p class="texto-ayuda">
+    Registro de quién hizo qué en el sistema. Es de solo lectura: no se puede editar ni borrar.
+    Sirve para identificar responsables y detectar accesos sospechosos.
+</p>
+
+<form method="GET" class="tarjeta" style="margin-bottom:18px">
+    <div class="fila-formulario">
+        <div>
+            <label for="desde">Desde</label>
+            <input type="date" id="desde" name="desde" value="{{ desde.isoformat() if desde else '' }}">
+        </div>
+        <div>
+            <label for="hasta">Hasta</label>
+            <input type="date" id="hasta" name="hasta" value="{{ hasta.isoformat() if hasta else '' }}">
+        </div>
+        <div>
+            <label for="usuario">Usuario</label>
+            <input type="text" id="usuario" name="usuario" value="{{ usuario }}" placeholder="Ej. jperez">
+        </div>
+    </div>
+    <div class="fila-formulario">
+        <div>
+            <label for="accion">Acción</label>
+            <select id="accion" name="accion">
+                <option value="">Todas</option>
+                {% for codigo, nombre in etiquetas.items() %}
+                <option value="{{ codigo }}" {% if accion == codigo %}selected{% endif %}>{{ nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="resultado">Resultado</label>
+            <select id="resultado" name="resultado">
+                <option value="">Todos</option>
+                <option value="exito" {% if resultado == 'exito' %}selected{% endif %}>Correcto</option>
+                <option value="fallo" {% if resultado == 'fallo' %}selected{% endif %}>Fallido</option>
+                <option value="denegado" {% if resultado == 'denegado' %}selected{% endif %}>Denegado</option>
+            </select>
+        </div>
+        <div style="flex:0; align-self:flex-end">
+            <button type="submit" class="boton-primario">Filtrar</button>
+        </div>
+    </div>
+</form>
+
+<div class="tarjeta">
+    <p class="texto-ayuda" style="margin-top:0">{{ total }} registro(s) encontrado(s).</p>
+    <table class="tabla">
+        <thead>
+            <tr>
+                <th>Fecha y hora</th>
+                <th>Usuario</th>
+                <th>Acción</th>
+                <th>Resultado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in registros %}
+            <tr>
+                <td>{{ r.fecha_hora.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                <td>{{ r.usuario_login or '—' }}</td>
+                <td>
+                    {{ etiquetas.get(r.accion, r.accion) }}
+                    {% if r.detalle %}<div class="texto-ayuda" style="margin:2px 0 0">{{ r.detalle }}</div>{% endif %}
+                    {% if r.resultado != 'exito' and r.ip %}<div class="texto-ayuda" style="margin:2px 0 0">Desde {{ r.ip }}</div>{% endif %}
+                </td>
+                <td>
+                    {% if r.resultado == 'exito' %}<span class="etiqueta etiqueta-activo">Correcto</span>
+                    {% elif r.resultado == 'fallo' %}<span class="etiqueta etiqueta-pendiente">Fallido</span>
+                    {% else %}<span class="etiqueta etiqueta-alerta">Denegado</span>{% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="sin-resultados">No hay registros con esos filtros.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if total_paginas > 1 %}
+    <div class="paginacion">
+        {% set base = {'desde': desde.isoformat() if desde else '', 'hasta': hasta.isoformat() if hasta else '',
+                       'usuario': usuario, 'accion': accion, 'resultado': resultado} %}
+        {% if pagina > 1 %}
+        <a class="boton-secundario" href="{{ url_for('auditoria.listar', pagina=pagina-1, **base) }}">← Anterior</a>
+        {% endif %}
+        <span class="paginacion-info">Página {{ pagina }} de {{ total_paginas }}</span>
+        {% if pagina < total_paginas %}
+        <a class="boton-secundario" href="{{ url_for('auditoria.listar', pagina=pagina+1, **base) }}">Siguiente →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

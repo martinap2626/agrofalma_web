@@ -8,6 +8,7 @@
 
 <div class="tarjeta tarjeta-formulario">
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {% set v = valores if valores is not none else producto %}
 
         <label for="codigo_producto">Código de producto</label>

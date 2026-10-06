@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block titulo %}{{ 'Editar' if evento else 'Registrar' }} evento — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>{{ 'Editar evento' if evento else 'Registrar evento del negocio' }}</h1>
+</div>
+
+<div class="tarjeta tarjeta-formulario">
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <label for="tipo">Tipo de evento</label>
+        <select id="tipo" name="tipo" required>
+            <option value="">Seleccione...</option>
+            {% for codigo, nombre in tipos.items() %}
+            <option value="{{ codigo }}" {% if valores.get('tipo') == codigo %}selected{% endif %}>{{ nombre }}</option>
+            {% endfor %}
+        </select>
+
+        <div class="fila-formulario">
+            <div>
+                <label for="fecha_inicio">Desde</label>
+                <input type="date" id="fecha_inicio" name="fecha_inicio" required value="{{ valores.get('fecha_inicio', '') }}">
+            </div>
+            <div>
+                <label for="fecha_fin">Hasta (opcional)</label>
+                <input type="date" id="fecha_fin" name="fecha_fin" value="{{ valores.get('fecha_fin', '') }}">
+            </div>
+        </div>
+
+        <div class="fila-formulario">
+            <div>
+                <label for="id_producto">Producto (vacío si afecta a todo el negocio)</label>
+                <select id="id_producto" name="id_producto">
+                    <option value="">Todo el negocio</option>
+                    {% for p in productos %}
+                    <option value="{{ p.id_producto }}" {% if valores.get('id_producto')|string == p.id_producto|string %}selected{% endif %}>{{ p.nombre_producto }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="id_sede">Sede (opcional)</label>
+                <select id="id_sede" name="id_sede">
+                    <option value="">Todas</option>
+                    {% for s in sedes %}
+                    <option value="{{ s.id_sede }}" {% if valores.get('id_sede')|string == s.id_sede|string %}selected{% endif %}>{{ s.nombre_sede }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <label for="descripcion">¿Qué pasó?</label>
+        <input type="text" id="descripcion" name="descripcion" required maxlength="200" value="{{ valores.get('descripcion', '') }}"
+               placeholder="Ej. Se agotó por una semana; plaga de gusano cogollero en maíz">
+
+        <div class="fila-formulario">
+            <div>
+                <label for="impacto">Impacto estimado en las ventas</label>
+                <select id="impacto" name="impacto">
+                    {% for codigo, nombre in impactos.items() %}
+                    <option value="{{ codigo }}" {% if valores.get('impacto', 'medio') == codigo %}selected{% endif %}>{{ nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="cantidad_no_atendida">Unidades que no se pudieron vender (solo quiebre de stock)</label>
+                <input type="number" min="1" max="1000000" id="cantidad_no_atendida" name="cantidad_no_atendida"
+                       value="{{ valores.get('cantidad_no_atendida', '') }}" placeholder="Opcional">
+            </div>
+        </div>
+        <p class="texto-ayuda">Si anotas las unidades no atendidas, la analítica las suma a la demanda del mes de inicio del evento.</p>
+
+        <label class="casilla">
+            <input type="checkbox" name="es_ejemplo" {% if valores.get('es_ejemplo') in (True, 'on') %}checked{% endif %}>
+            Es solo un ejemplo (para ver cómo funciona; no afecta los cálculos)
+        </label>
+
+        <div class="acciones-formulario">
+            <a href="{{ url_for('eventos.listar') }}" class="boton-secundario">Cancelar</a>
+            <button type="submit" class="boton-primario">Guardar</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

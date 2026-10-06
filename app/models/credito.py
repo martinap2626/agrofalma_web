@@ -10,11 +10,12 @@ class Credito(db.Model):
     """
 
     __tablename__ = "creditos"
+    __table_args__ = (db.Index("ix_creditos_estado", "estado"),)
 
     id_credito = db.Column(db.Integer, primary_key=True)
     id_venta = db.Column(db.Integer, db.ForeignKey("ventas.id_venta"), nullable=False)
     monto_credito = db.Column(db.Numeric(10, 2), nullable=False)
-    fecha_credito = db.Column(db.Date, nullable=False, server_default=db.func.current_date())
+    fecha_credito = db.Column(db.Date, nullable=False, server_default=db.text("(CURRENT_DATE)"))
     saldo_pendiente = db.Column(db.Numeric(10, 2), nullable=False)
     estado = db.Column(db.Enum("pendiente", "pagado", name="estado_credito"), nullable=False, default="pendiente")
 

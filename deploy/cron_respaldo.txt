@@ -1,0 +1,5 @@
+# Respaldo diario de la base a las 2 AM (Linux). Agregar con: crontab -e
+0 2 * * * cd /opt/agrofalma/agrofalma_web && .venv/bin/flask respaldar-bd >> logs/respaldo.log 2>&1
+# Actualizar la analítica el día 1 de cada mes a las 3 AM (después de cargar las ventas del mes anterior)
+0 3 1 * * cd /opt/agrofalma/agrofalma_web && .venv/bin/flask actualizar-analitica >> logs/analitica.log 2>&1
+# En Windows: ver scripts/programar_respaldo_windows.ps1

@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block titulo %}Ayuda — Agrofalma{% endblock %}
+
+{% block contenido %}
+{% set es_admin = current_user.es_administrador %}
+
+<div class="cabecera-pagina">
+    <h1>Centro de ayuda</h1>
+</div>
+
+<p class="texto-ayuda">
+    Guía rápida para usar el sistema. Estás viendo la ayuda del rol <strong>{{ current_user.rol.nombre_rol }}</strong>.
+    Si algo no queda claro, consulta con el administrador del sistema.
+</p>
+
+<nav class="tarjeta ayuda-indice" aria-label="Contenido de la ayuda">
+    <strong>En esta página:</strong>
+    <a href="#primeros-pasos">Primeros pasos</a>
+    {% if not es_admin %}
+    <a href="#vender">Registrar una venta</a>
+    <a href="#creditos">Créditos y cobros</a>
+    <a href="#clientes">Clientes</a>
+    <a href="#mis-ventas">Mis ventas del día</a>
+    {% else %}
+    <a href="#dashboard">Dashboard</a>
+    <a href="#consolidado">Ventas consolidadas</a>
+    <a href="#catalogo">Productos</a>
+    <a href="#analitica">Analítica comercial</a>
+    <a href="#reportes">Reportes</a>
+    <a href="#usuarios">Usuarios</a>
+    <a href="#eventos">Eventos del negocio</a>
+    <a href="#auditoria">Auditoría</a>
+    {% endif %}
+    <a href="#preguntas">Preguntas frecuentes</a>
+    <a href="#glosario">Glosario</a>
+</nav>
+
+<section class="tarjeta ayuda-seccion" id="primeros-pasos">
+    <h2>Primeros pasos</h2>
+    <ol>
+        <li>Escribe tu <strong>usuario</strong> y tu <strong>contraseña</strong> en la pantalla de inicio de sesión y pulsa <em>Ingresar</em>. El ícono del ojo permite ver lo que escribes.</li>
+        <li>El menú de la izquierda muestra solo lo que tu rol puede usar. {% if es_admin %}Como Administrador ves todos los módulos.{% else %}Como Trabajador ves tus ventas, el catálogo de productos, los clientes y tus créditos.{% endif %}</li>
+        <li>Al terminar, pulsa <em>Salir</em> (arriba a la derecha). Si dejas el sistema sin usar durante 30 minutos, se cierra la sesión solo, para proteger la información.</li>
+    </ol>
+    <p class="texto-ayuda">
+        Por seguridad, tras 5 intentos fallidos de contraseña la cuenta se bloquea unos minutos. Si pasa, espera
+        {% if es_admin %}o revisa el módulo de Auditoría{% else %}o pide ayuda al administrador{% endif %}.
+    </p>
+</section>
+
+{% if not es_admin %}
+<section class="tarjeta ayuda-seccion" id="vender">
+    <h2>Registrar una venta</h2>
+    <ol>
+        <li>Entra a <em>Mis ventas</em> y pulsa <em>+ Nueva venta</em>.</li>
+        <li>Elige el <strong>cliente</strong>. Si no existe, créalo antes en la pestaña <em>Clientes</em>.</li>
+        <li>Elige el <strong>tipo de venta</strong>: <em>Contado</em> (el cliente paga ahora) o <em>Crédito</em> (pagará después).</li>
+        <li>En <em>Productos</em>, selecciona el producto y la cantidad. Pulsa <em>+ Agregar línea</em> para sumar más productos y <em>Quitar</em> para borrar una línea. El total se calcula solo.</li>
+        <li>Pulsa <em>Registrar venta</em>. El sistema descuenta el stock de tu sede automáticamente.</li>
+    </ol>
+    <p class="texto-ayuda">Una venta registrada no se puede editar ni borrar, porque funciona como comprobante. Si te equivocas, avisa al administrador.</p>
+</section>
+
+<section class="tarjeta ayuda-seccion" id="creditos">
+    <h2>Créditos y cobros</h2>
+    <ol>
+        <li>Abre la pestaña <em>Créditos y cobros</em>: verás los créditos de tus propias ventas, con su saldo pendiente.</li>
+        <li>Pulsa el ícono de la lupa para ver el detalle y el historial de pagos.</li>
+        <li>En <em>Registrar pago</em>, escribe el <strong>monto recibido</strong> y confirma. El saldo baja; cuando llega a cero, el crédito pasa a <em>Pagado</em>.</li>
+    </ol>
+    <p class="texto-ayuda">El monto no puede ser mayor al saldo pendiente.</p>
+</section>
+
+<section class="tarjeta ayuda-seccion" id="clientes">
+    <h2>Clientes</h2>
+    <p>En la pestaña <em>Clientes</em> puedes buscar, crear y editar clientes. Solo el nombre es obligatorio. Un cliente desactivado ya no aparece al registrar ventas, pero su historial se conserva.</p>
+</section>
+
+<section class="tarjeta ayuda-seccion" id="mis-ventas">
+    <h2>Mis ventas del día</h2>
+    <p>
+        Es tu pantalla de inicio: muestra lo que vendiste hoy (contado y crédito), lo cobrado hoy, tus créditos pendientes de
+        cobrar y los productos con <strong>stock bajo</strong> en tu sede. Cambia la fecha para revisar otro día.
+    </p>
+</section>
+
+{% else %}
+<section class="tarjeta ayuda-seccion" id="dashboard">
+    <h2>Dashboard comercial</h2>
+    <p>
+        Resume un mes a la vez: ventas al contado, ventas a crédito, cobros del mes, ventas por categoría y por trabajador,
+        productos más vendidos, stock bajo y alertas urgentes de reposición. El <em>Panorama de la analítica</em> resume cuántas unidades se esperan vender, cuántos productos hay en cada clase, cuántas reposiciones son urgentes y los últimos eventos del negocio. Usa los filtros <em>Mes</em> y <em>Sede</em>
+        para aislar una sede, que es lo más útil para comparar Pimentel y Chacupe.
+    </p>
+</section>
+
+<section class="tarjeta ayuda-seccion" id="consolidado">
+    <h2>Ventas consolidadas</h2>
+    <p>
+        Lista las ventas de todas las sedes. Por defecto muestra los últimos 30 días; cambia <em>Desde</em> y <em>Hasta</em>,
+        o filtra por trabajador, categoría y sede, y pulsa <em>Filtrar</em>. La lupa abre el detalle de cada venta.
+        Cuando hay más de {{ 500 }} resultados, se muestran los más recientes: acota las fechas para ver el resto.
+    </p>
+</section>
+
+<section class="tarjeta ayuda-seccion" id="catalogo">
+    <h2>Productos</h2>
+    <p>
+        Crea, edita, desactiva y reactiva productos. El <strong>stock mínimo</strong> es el nivel por debajo del cual el sistema
+        avisa que hay que reponer. Un producto desactivado no se puede vender, pero su historial se conserva.
+    </p>
+</section>
+
+<section class="tarjeta ayuda-seccion" id="analitica">
+    <h2>Analítica comercial</h2>
+    <p>Tiene cinco pantallas, que se leen juntas para decidir qué reponer y cuánto:</p>
+    <ul>
+        <li><strong>Recomendaciones de abastecimiento:</strong> combinan la predicción de demanda y la clase ABC para decir cuánto conviene tener disponible de cada producto (<em>stock objetivo</em>) y cuándo reponer (<em>punto de reposición</em>). Con inventario cargado indican cuánto <em>reponer</em> y la urgencia (<em>Urgente</em>, <em>Media</em>, <em>Sin acción</em>); sin inventario muestran el <em>plan</em> ordenado por prioridad. La explicación de cada cálculo está en la propia pantalla.</li>
+        <li><strong>Predicción de demanda:</strong> cuánto conviene tener listo el próximo periodo. <em>Cantidad sugerida a reponer</em> ya viene redondeada hacia arriba. <em>Tendencia</em> compara contra el mes pasado y <em>Confiabilidad</em> (Alta, Media o Baja) indica qué tan bien le ha ido al modelo con ese tipo de producto.</li>
+        <li><strong>Plan de campaña:</strong> cuánto se espera vender de cada producto en toda la campaña (grande: enero a junio; chica: julio a diciembre), cuánto va vendido y cuánto falta. Sirve para planificar las compras grandes; se corrige solo a medida que avanza la campaña.</li>
+        <li><strong>Simulador de escenarios:</strong> responde «¿qué pasa si…?»: elige un producto, cambia la demanda esperada (por ejemplo +30 %), los días de reposición o el stock, y compara con la recomendación normal. No guarda nada.</li>
+        <li><strong>Segmentación ABC:</strong> ordena los productos por su peso en las ventas de los últimos 12 meses. Ver el glosario.</li>
+    </ul>
+    <p class="texto-ayuda">Son una guía para decidir, no una orden: tu conocimiento de la campaña y de los clientes sigue siendo clave. Con confiabilidad Baja, tómalo con más cautela.</p>
+</section>
+
+<section class="tarjeta ayuda-seccion" id="reportes">
+    <h2>Reportes</h2>
+    <ol>
+        <li>Elige el <em>Tipo de reporte</em> (ventas o productos más vendidos), el rango <em>Desde / Hasta</em> y, si quieres, la <em>Sede</em>.</li>
+        <li>Pulsa <em>Generar reporte</em> para verlo en pantalla.</li>
+        <li>Pulsa <em>Exportar CSV</em> para descargarlo y abrirlo en Excel.</li>
+    </ol>
+</section>
+
+<section class="tarjeta ayuda-seccion" id="usuarios">
+    <h2>Usuarios</h2>
+    <p>
+        Crea cuentas, asigna el <strong>rol</strong> (Administrador o Trabajador) y la <strong>sede</strong>, y desactiva las de quien ya no trabaja
+        en la empresa (no se borran, para conservar el historial). Las contraseñas nuevas deben tener al menos 8 caracteres y combinar letras y números.
+    </p>
+</section>
+
+<section class="tarjeta ayuda-seccion" id="eventos">
+    <h2>Eventos del negocio</h2>
+    <p>
+        Anota los hechos que explican las ventas de un mes, una campaña o un año: un producto que se agotó, una plaga, una promoción o un problema
+        de producción. Pulsa <em>+ Registrar evento</em>, elige el tipo, las fechas y el producto (o «Todo el negocio»), describe qué pasó y guarda.
+    </p>
+    <ul>
+        <li><strong>Quiebre de stock:</strong> si anotas cuántas unidades no se pudieron vender, el sistema las suma a la demanda de ese mes la próxima vez que se actualice la analítica.</li>
+        <li><strong>Otros eventos:</strong> aparecen como etiqueta <em>Evento</em> junto al producto en la Predicción de demanda y en el dashboard.</li>
+        <li>Puedes filtrar por año, campaña (grande o chica) y tipo. Todo cambio queda en la auditoría.</li>
+    </ul>
+</section>
+
+<section class="tarjeta ayuda-seccion" id="auditoria">
+    <h2>Auditoría</h2>
+    <p>
+        Registra quién hizo qué y cuándo: inicios de sesión, intentos fallidos, ventas, pagos, cambios en productos y usuarios, y
+        accesos denegados. Filtra por fecha, usuario, acción o resultado. Es de solo lectura: nadie puede editar ni borrar estos registros.
+        Si ves muchos <em>intentos de acceso fallidos</em> de una misma cuenta o dirección, alguien podría estar probando contraseñas.
+    </p>
+</section>
+{% endif %}
+
+<section class="tarjeta ayuda-seccion" id="preguntas">
+    <h2>Preguntas frecuentes</h2>
+
+    <details>
+        <summary>Me dice «Usuario o contraseña incorrectos»</summary>
+        <p>Revisa mayúsculas y minúsculas. Por seguridad, el sistema no dice cuál de los dos datos falló. Tras 5 intentos fallidos la cuenta se bloquea unos minutos.</p>
+    </details>
+    <details>
+        <summary>Me dice «Esta cuenta se encuentra desactivada»</summary>
+        <p>Tu cuenta fue desactivada. Pide al administrador que la reactive.</p>
+    </details>
+    <details>
+        <summary>Me sacó del sistema sin que yo hiciera nada</summary>
+        <p>Tras 30 minutos sin actividad la sesión se cierra por seguridad. Vuelve a ingresar; no se pierde lo ya guardado.</p>
+    </details>
+    <details>
+        <summary>«No se pudo procesar el formulario»</summary>
+        <p>La página estuvo abierta mucho tiempo y por seguridad el sistema no aceptó los datos. No se guardó nada: recarga la página y vuelve a llenar el formulario.</p>
+    </details>
+    <details>
+        <summary>«No hay stock suficiente»</summary>
+        <p>Pediste más unidades de las que hay en tu sede. Baja la cantidad o avisa al administrador para reponer.</p>
+    </details>
+    <details>
+        <summary>«El monto debe ser mayor a 0 y no puede superar el saldo pendiente»</summary>
+        <p>En un pago de crédito, el monto debe ser positivo y no mayor a lo que el cliente aún debe.</p>
+    </details>
+    <details>
+        <summary>«No se pudo conectar con la base de datos»</summary>
+        <p>El sistema tiene un problema temporal para acceder a la información. No se perdió nada: espera unos minutos y pulsa <em>Reintentar</em>. Si continúa, avisa a soporte técnico.</p>
+    </details>
+    <details>
+        <summary>Veo «403 — Acceso restringido»</summary>
+        <p>Esa pantalla no corresponde a tu rol. Por ejemplo, Usuarios, Auditoría y Reportes son solo para el Administrador.</p>
+    </details>
+    <details>
+        <summary>Escribí mal una venta, ¿puedo corregirla?</summary>
+        <p>No. Las ventas son comprobantes y no se editan ni se borran. Avisa al administrador para que decida cómo regularizarla.</p>
+    </details>
+</section>
+
+<section class="tarjeta ayuda-seccion" id="glosario">
+    <h2>Glosario</h2>
+    <dl>
+        <dt>Stock mínimo</dt>
+        <dd>Cantidad por debajo de la cual el producto se considera en nivel bajo y conviene reponerlo.</dd>
+        <dt>Crédito / Saldo pendiente</dt>
+        <dd>Venta que el cliente pagará después. El saldo pendiente es lo que aún debe.</dd>
+        <dt>Cobro (recuperación)</dt>
+        <dd>Pago que el cliente hace sobre un crédito.</dd>
+        <dt>Clase A, B y C (segmentación ABC)</dt>
+        <dd>
+            <strong>A:</strong> pocos productos que concentran la mayor parte de las ventas (cerca del 80%); requieren la reposición más cuidadosa y nunca deberían quedarse sin stock.
+            <strong>B:</strong> peso intermedio (cerca del 15%); seguimiento periódico.
+            <strong>C:</strong> muchos productos de poco movimiento (cerca del 5%); conviene no sobrecomprar.
+        </dd>
+        <dt>Demanda prevista</dt>
+        <dd>Cantidad que el modelo estima que se venderá en el próximo periodo, según el historial.</dd>
+        <dt>Cantidad sugerida a reponer</dt>
+        <dd>Unidades que conviene tener listas, ya redondeadas hacia arriba.</dd>
+        <dt>Plan de campaña</dt>
+        <dd>Estimación de lo que se venderá de cada producto en una campaña completa. La campaña grande va de enero a junio y la chica de julio a diciembre.</dd>
+        <dt>Ritmo de la campaña</dt>
+        <dd>Cuánto lleva vendido la campaña frente a lo que se había vendido el año pasado en el mismo tramo. 100% = igual que el año pasado.</dd>
+        <dt>Stock objetivo</dt>
+        <dd>Hasta cuánto conviene tener de un producto: lo que se espera vender el próximo mes, más lo que se vende mientras llega la reposición, más un margen de seguridad.</dd>
+        <dt>Punto de reposición</dt>
+        <dd>Nivel de stock por debajo del cual conviene reponer: lo que se vende mientras llega la reposición más el margen de seguridad.</dd>
+        <dt>Margen de seguridad</dt>
+        <dd>Colchón contra los errores del pronóstico. Es mayor en los productos clase A y en los que el pronóstico acierta menos.</dd>
+        <dt>Plan de abastecimiento</dt>
+        <dd>Lo que el sistema recomienda cuando todavía no hay inventario cargado: cuánto tener disponible de cada producto, de mayor a menor prioridad.</dd>
+        <dt>Tendencia</dt>
+        <dd>Si se espera vender más (▲), menos (▼) o igual que el mes pasado.</dd>
+        <dt>Confiabilidad</dt>
+        <dd>Qué tan bien ha acertado el modelo con ese tipo de producto en pruebas anteriores: Alta, Media o Baja.</dd>
+        <dt>Campaña grande y chica</dt>
+        <dd>La campaña grande va de enero a junio y la chica de julio a diciembre; la demanda cambia según la campaña.</dd>
+    </dl>
+</section>
+{% endblock %}

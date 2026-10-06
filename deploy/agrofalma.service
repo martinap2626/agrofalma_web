@@ -1,0 +1,16 @@
+# Servicio de systemd (Linux). Copiar a /etc/systemd/system/agrofalma.service, ajustar rutas y ejecutar:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now agrofalma
+[Unit]
+Description=Agrofalma - sistema inteligente de apoyo a decisiones comerciales
+After=network.target mysql.service
+
+[Service]
+User=agrofalma
+WorkingDirectory=/opt/agrofalma/agrofalma_web
+ExecStart=/opt/agrofalma/agrofalma_web/.venv/bin/python servir.py
+Environment=HOST=127.0.0.1 PORT=8000 HILOS=8
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

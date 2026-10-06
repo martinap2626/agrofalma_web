@@ -28,6 +28,20 @@ def mape(y_real, y_pred) -> float | None:
     return float(np.mean(np.abs((y_real[con_venta] - y_pred[con_venta]) / y_real[con_venta])) * 100)
 
 
+def smape(y_real, y_pred) -> float | None:
+    """MAPE simetrico (Makridakis, 1993): divide entre el promedio de |real|
+    y |predicho| en vez de solo |real|, por eso no se dispara cuando el real
+    es chico -- sigue siendo una metrica de la familia MAPE (mismo tipo de
+    interpretacion como % de error), no una metrica distinta como MASE/WAPE."""
+    y_real = np.asarray(y_real, dtype=float)
+    y_pred = np.clip(np.asarray(y_pred, dtype=float), a_min=0, a_max=None)
+    denominador = (np.abs(y_real) + np.abs(y_pred)) / 2
+    con_denominador = denominador > 0
+    if con_denominador.sum() == 0:
+        return None
+    return float(np.mean(np.abs(y_real[con_denominador] - y_pred[con_denominador]) / denominador[con_denominador]) * 100)
+
+
 def wape(y_real, y_pred) -> float | None:
     """Weighted Absolute Percentage Error: suma de errores absolutos / suma de ventas reales.
     A diferencia del MAPE, no se indefine con ceros individuales (solo si la suma total es 0)."""

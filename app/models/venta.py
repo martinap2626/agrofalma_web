@@ -10,6 +10,13 @@ class Venta(db.Model):
     """
 
     __tablename__ = "ventas"
+    # índices por fecha: casi todas las pantallas filtran ventas por rango de
+    # fechas (dashboard, reportes, mis ventas, consolidado)
+    __table_args__ = (
+        db.Index("ix_ventas_fecha", "fecha_hora"),
+        db.Index("ix_ventas_usuario_fecha", "id_usuario", "fecha_hora"),
+        db.Index("ix_ventas_sede_fecha", "id_sede", "fecha_hora"),
+    )
 
     id_venta = db.Column(db.Integer, primary_key=True)
     numero_operacion = db.Column(db.String(15), nullable=False, unique=True)

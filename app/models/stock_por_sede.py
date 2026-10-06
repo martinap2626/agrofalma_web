@@ -8,6 +8,9 @@ class StockPorSede(db.Model):
     id_producto = db.Column(db.Integer, db.ForeignKey("productos.id_producto"), nullable=False)
     id_sede = db.Column(db.Integer, db.ForeignKey("sedes.id_sede"), nullable=False)
     cantidad_actual = db.Column(db.Integer, nullable=False, default=0)
+    # "real" = conteo hecho en almacén; "provisional" = estimado a partir de las ventas mientras la empresa no
+    # lleva un registro de inventario (se muestra un aviso en pantalla y se reemplaza al cargar el conteo real)
+    origen = db.Column(db.String(15), nullable=False, default="real", server_default="real")
     fecha_actualizacion = db.Column(db.DateTime, server_default=db.func.now())
 
     producto = db.relationship("Producto", back_populates="stock_por_sede")

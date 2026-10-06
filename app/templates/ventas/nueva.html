@@ -12,13 +12,15 @@
 <div class="tarjeta">
     {% set v = valores if valores is not none else {} %}
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="fila-formulario">
             <div>
                 <label for="id_cliente">Cliente</label>
                 <select id="id_cliente" name="id_cliente" required>
                     <option value="">Seleccione...</option>
+                    {% set cliente_elegido = v.get('id_cliente')|string %}
                     {% for c in clientes %}
-                    <option value="{{ c.id_cliente }}" {% if v.get('id_cliente')|string == c.id_cliente|string %}selected{% endif %}>
+                    <option value="{{ c.id_cliente }}" {% if cliente_elegido == c.id_cliente|string %}selected{% endif %}>
                         {{ c.nombre_cliente }}
                     </option>
                     {% endfor %}
@@ -60,8 +62,8 @@
                         </select>
                     </td>
                     <td><input type="number" name="cantidad[]" min="1" value="1" required></td>
-                    <td><input type="number" name="precio_unitario[]" min="0" step="0.01"></td>
-                    <td class="subtotal-linea">S/ 0.00</td>
+                    <td><input type="number" name="precio_unitario[]" class="monto" min="0" step="0.01"></td>
+                    <td class="subtotal-linea monto">S/ 0.00</td>
                     <td><button type="button" class="boton-secundario boton-quitar-linea">Quitar</button></td>
                 </tr>
             </tbody>
@@ -80,18 +82,18 @@
                     </select>
                 </td>
                 <td><input type="number" name="cantidad[]" min="1" value="1" required></td>
-                <td><input type="number" name="precio_unitario[]" min="0" step="0.01"></td>
-                <td class="subtotal-linea">S/ 0.00</td>
+                <td><input type="number" name="precio_unitario[]" class="monto" min="0" step="0.01"></td>
+                <td class="subtotal-linea monto">S/ 0.00</td>
                 <td><button type="button" class="boton-secundario boton-quitar-linea">Quitar</button></td>
             </tr>
         </template>
 
         <button type="button" id="boton-agregar-linea" class="boton-secundario" style="margin-top:10px">+ Agregar línea</button>
 
-        <div id="total-venta" class="total-venta">Total: S/ 0.00</div>
+        <div id="total-venta" class="total-venta monto">Total: S/ 0.00</div>
 
         <div class="acciones-formulario">
-            <a href="{{ url_for('ventas.listar') }}" class="boton-secundario">Cancelar</a>
+            <a href="{{ url_for('ventas.listar') if current_user.es_administrador else url_for('ventas.mis_ventas') }}" class="boton-secundario">Cancelar</a>
             <button type="submit" class="boton-primario">Registrar venta</button>
         </div>
     </form>

@@ -16,8 +16,8 @@
         <div><strong>Fecha del crédito:</strong> {{ credito.fecha_credito.strftime('%d/%m/%Y') }}</div>
     </div>
     <div class="fila-formulario">
-        <div><strong>Monto original:</strong> S/ {{ "%.2f"|format(credito.monto_credito) }}</div>
-        <div><strong>Saldo pendiente:</strong> S/ {{ "%.2f"|format(credito.saldo_pendiente) }}</div>
+        <div><strong>Monto original:</strong> <span class="monto">S/ {{ "%.2f"|format(credito.monto_credito) }}</span></div>
+        <div><strong>Saldo pendiente:</strong> <span class="monto">S/ {{ "%.2f"|format(credito.saldo_pendiente) }}</span></div>
     </div>
     <div>
         <strong>Estado:</strong>
@@ -35,6 +35,7 @@
 <div class="tarjeta tarjeta-formulario" style="margin-bottom:18px">
     <h2 style="font-size:16px;margin-top:0">Registrar pago</h2>
     <form method="POST" action="{{ url_for('ventas.registrar_pago', id_credito=credito.id_credito) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label for="monto_recuperado">Monto a registrar (S/)</label>
         <input type="number" step="0.01" min="0.01" max="{{ credito.saldo_pendiente }}"
                id="monto_recuperado" name="monto_recuperado" required>
@@ -59,7 +60,7 @@
             {% for pago in credito.recuperaciones|sort(attribute='fecha_recuperacion', reverse=True) %}
             <tr>
                 <td>{{ pago.fecha_recuperacion.strftime('%d/%m/%Y') }}</td>
-                <td>S/ {{ "%.2f"|format(pago.monto_recuperado) }}</td>
+                <td><span class="monto">S/ {{ "%.2f"|format(pago.monto_recuperado) }}</span></td>
                 <td>{{ pago.usuario.nombre_completo }}</td>
             </tr>
             {% else %}

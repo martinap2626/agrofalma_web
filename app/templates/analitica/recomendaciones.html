@@ -12,6 +12,10 @@
     <div class="acciones-cabecera">
         <a href="{{ url_for('analitica.recomendaciones') }}"
            class="boton-secundario {% if not filtro_urgencia %}activo{% endif %}">Todas</a>
+        {% if hay_plan %}
+        <a href="{{ url_for('analitica.recomendaciones', urgencia='plan') }}"
+           class="boton-secundario {% if filtro_urgencia == 'plan' %}activo{% endif %}">Plan</a>
+        {% endif %}
         <a href="{{ url_for('analitica.recomendaciones', urgencia='urgente') }}"
            class="boton-secundario {% if filtro_urgencia == 'urgente' %}activo{% endif %}">Urgente</a>
         <a href="{{ url_for('analitica.recomendaciones', urgencia='media') }}"
@@ -21,40 +25,97 @@
     </div>
 </div>
 
+{% if ejecucion %}
+<details class="tarjeta explicacion" open>
+    <summary>¿Cómo se calculan estas recomendaciones?</summary>
+    <p>
+        Cada recomendación combina <strong>dos resultados</strong> del sistema: la
+        <a href="{{ url_for('analitica.prediccion') }}">predicción de demanda</a> (cuánto se espera vender el próximo mes)
+        y la <a href="{{ url_for('analitica.segmentacion') }}">clase ABC</a> del producto (cuánto pesa en las ventas).
+        Para cada producto se calculan tres números:
+    </p>
+    <ol>
+        <li><strong>Lo que se venderá mientras llega la reposición:</strong> la demanda del mes × ({{ parametros.tiempo_reposicion_dias }} días ÷ 30).
+            Se asume que la reposición tarda <strong>{{ parametros.tiempo_reposicion_dias }} días</strong> en llegar.</li>
+        <li><strong>Margen de seguridad:</strong> un colchón por si el pronóstico se equivoca. Se basa en cuánto se equivocó el
+            pronóstico <em>de ese mismo producto</em> en los últimos 8 meses, y es mayor en los productos de clase A, que no
+            deberían quedarse sin stock:
+            <strong>A</strong> {{ parametros.nivel_proteccion_pct('A') }}% de protección,
+            <strong>B</strong> {{ parametros.nivel_proteccion_pct('B') }}%,
+            <strong>C</strong> {{ parametros.nivel_proteccion_pct('C') }}%
+            (con tope para no acumular de más en productos de poco movimiento).</li>
+        <li><strong>Stock objetivo</strong> = demanda del mes + lo que se vende mientras llega la reposición + margen de seguridad.
+            El <strong>punto de reposición</strong> = lo que se vende mientras llega la reposición + margen de seguridad.</li>
+    </ol>
+    {% if hay_plan %}
+    <p>
+        <strong>Estado actual: plan de abastecimiento.</strong> Todavía no hay inventario cargado, así que el sistema no puede decir
+        "falta" o "sobra"; indica <strong>cuánto conviene tener disponible</strong> de cada producto, ordenado por prioridad
+        (clase A primero). Cuando se cargue el stock actual, cada fila pasará a decir cuánto <strong>reponer</strong>.
+    </p>
+    {% endif %}
+    <p>
+        <strong>Con inventario</strong> la regla es: si el stock actual no alcanza para lo que se venderá mientras llega la reposición,
+        es <span class="etiqueta etiqueta-alerta">Urgente</span> (en clase C se marca Media); si está en o por debajo del punto de reposición,
+        es <span class="etiqueta etiqueta-pendiente">Media</span>; si está por encima, <span class="etiqueta etiqueta-inactivo">Sin acción</span>.
+        La cantidad a reponer es el stock objetivo menos lo que hay.
+    </p>
+    <p class="texto-ayuda">
+        Los {{ parametros.tiempo_reposicion_dias }} días de reposición y los niveles de protección son <strong>supuestos</strong> a confirmar
+        con el gerente. Las recomendaciones son una guía: tu conocimiento de la campaña, los clientes y los proveedores sigue siendo clave.
+    </p>
+</details>
+{% endif %}
+
 <div class="tarjeta">
     {% if recomendaciones %}
-    <table class="tabla" id="tabla-recomendaciones" data-paginacion="10">
+    <table class="tabla" id="tabla-recomendaciones" data-paginacion="12">
         <thead>
             <tr>
                 <th>Producto</th>
-                <th>Sede</th>
-                <th>Urgencia</th>
+                <th>Clase</th>
+                <th>{{ 'Prioridad' if hay_plan and not hay_inventario else 'Urgencia' }}</th>
                 <th>Stock actual</th>
                 <th>Demanda prevista</th>
-                <th>Cantidad sugerida</th>
+                <th>Tener disponible</th>
+                <th>Reponer</th>
                 <th>Por qué</th>
-                <th>Calculado</th>
             </tr>
         </thead>
         <tbody>
             {% for r in recomendaciones %}
             <tr>
                 <td>{{ r.producto.nombre_producto }}</td>
-                <td>{{ r.sede.nombre_sede }}</td>
+                <td>
+                    {% if r.clase_abc == 'A' %}<span class="etiqueta etiqueta-activo">A</span>
+                    {% elif r.clase_abc == 'B' %}<span class="etiqueta etiqueta-pendiente">B</span>
+                    {% elif r.clase_abc == 'C' %}<span class="etiqueta etiqueta-inactivo">C</span>
+                    {% else %}—{% endif %}
+                </td>
                 <td>
                     {% if r.nivel_urgencia == 'urgente' %}
                     <span class="etiqueta etiqueta-alerta">Urgente</span>
                     {% elif r.nivel_urgencia == 'media' %}
                     <span class="etiqueta etiqueta-pendiente">Media</span>
+                    {% elif r.nivel_urgencia == 'plan' %}
+                    <span class="etiqueta {{ 'etiqueta-activo' if r.clase_abc == 'A' else ('etiqueta-pendiente' if r.clase_abc == 'B' else 'etiqueta-inactivo') }}">
+                        Prioridad {{ {'A': 'alta', 'B': 'media', 'C': 'baja'}.get(r.clase_abc, '—') }}
+                    </span>
                     {% else %}
                     <span class="etiqueta etiqueta-inactivo">Sin acción</span>
                     {% endif %}
                 </td>
-                <td>{{ r.stock_actual }}</td>
-                <td>{{ "%.2f"|format(r.demanda_prevista) }}</td>
-                <td>{{ r.cantidad_sugerida }}</td>
-                <td>{{ r.motivo or '—' }}</td>
-                <td>{{ r.fecha_generacion.strftime('%d/%m/%Y') }}</td>
+                <td>{{ r.stock_actual if r.stock_actual is not none else '—' }}</td>
+                <td>{{ "%.1f"|format(r.demanda_prevista) }}</td>
+                <td>{{ r.stock_objetivo if r.stock_objetivo is not none else '—' }}</td>
+                <td>
+                    {% if r.nivel_urgencia == 'plan' %}—
+                    {% else %}<strong>{{ r.cantidad_sugerida }}</strong>{% endif %}
+                </td>
+                <td>
+                    {{ r.motivo or '—' }}
+                    {% if r.reparto %}<br><span class="texto-ayuda">{{ r.reparto }}</span>{% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>

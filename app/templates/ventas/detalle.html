@@ -7,7 +7,7 @@
 
 <div class="cabecera-pagina">
     <h1>Venta {{ venta.numero_operacion }}</h1>
-    <a href="{{ url_for('ventas.listar') }}" class="boton-secundario">Volver al listado</a>
+    <a href="{{ url_for('ventas.listar') if current_user.es_administrador else url_for('ventas.mis_ventas') }}" class="boton-secundario">Volver al listado</a>
 </div>
 
 <div class="tarjeta" style="margin-bottom:18px">
@@ -53,15 +53,15 @@
             <tr>
                 <td>{{ linea.producto.nombre_producto }}</td>
                 <td>{{ linea.cantidad }}</td>
-                <td>S/ {{ "%.2f"|format(linea.precio_unitario) }}</td>
-                <td>S/ {{ "%.2f"|format(linea.subtotal) }}</td>
+                <td><span class="monto">S/ {{ "%.2f"|format(linea.precio_unitario) }}</span></td>
+                <td><span class="monto">S/ {{ "%.2f"|format(linea.subtotal) }}</span></td>
             </tr>
             {% endfor %}
         </tbody>
         <tfoot>
             <tr>
                 <td colspan="3" style="text-align:right"><strong>Total</strong></td>
-                <td><strong>S/ {{ "%.2f"|format(venta.total) }}</strong></td>
+                <td><strong><span class="monto">S/ {{ "%.2f"|format(venta.total) }}</span></strong></td>
             </tr>
         </tfoot>
     </table>
@@ -71,8 +71,8 @@
 <div class="tarjeta" style="margin-top:18px">
     <h2 style="font-size:16px;margin-top:0">Crédito de esta venta</h2>
     <p>
-        Saldo pendiente: <strong>S/ {{ "%.2f"|format(venta.credito.saldo_pendiente) }}</strong>
-        de S/ {{ "%.2f"|format(venta.credito.monto_credito) }}
+        Saldo pendiente: <strong><span class="monto">S/ {{ "%.2f"|format(venta.credito.saldo_pendiente) }}</span></strong>
+        de <span class="monto">S/ {{ "%.2f"|format(venta.credito.monto_credito) }}</span>
     </p>
     <a href="{{ url_for('ventas.detalle_credito', id_credito=venta.credito.id_credito) }}" class="boton-primario">
         Ver crédito y registrar pagos

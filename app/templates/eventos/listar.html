@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block titulo %}Eventos del negocio — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Eventos del negocio</h1>
+    <div class="acciones-cabecera">
+        <a href="{{ url_for('eventos.nuevo') }}" class="boton-primario">+ Registrar evento</a>
+    </div>
+</div>
+
+<details class="tarjeta explicacion" open>
+    <summary>¿Para qué sirve esta pantalla?</summary>
+    <p>
+        Las ventas dicen <strong>qué</strong> se vendió, pero no <strong>por qué</strong>. Aquí se anotan los hechos que explican un mes,
+        una campaña o un año: un producto que se agotó, una plaga, una promoción, un problema en la producción propia.
+    </p>
+    <ul>
+        <li><strong>Quiebre de stock:</strong> si anotas cuántas unidades no se pudieron vender, el sistema las <strong>suma a la demanda</strong>
+            de ese mes la próxima vez que actualice la analítica. Así un producto que se agotó no parece de poco movimiento y las recomendaciones de reposición mejoran.</li>
+        <li><strong>Eventos de ejemplo:</strong> los marcados como «Ejemplo» sirven para ver cómo funciona la pantalla y <strong>no afectan ningún cálculo</strong>.</li>
+        <li><strong>Otros eventos:</strong> quedan registrados y se muestran junto a las predicciones del producto, para interpretar los meses fuera de lo normal.</li>
+    </ul>
+</details>
+
+<form method="GET" class="tarjeta" style="margin-bottom:18px">
+    <div class="fila-formulario">
+        <div>
+            <label for="anio">Año</label>
+            <select id="anio" name="anio">
+                <option value="">Todos</option>
+                {% for a in anios %}<option value="{{ a }}" {% if anio == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="campana">Campaña</label>
+            <select id="campana" name="campana">
+                <option value="">Todas</option>
+                <option value="grande" {% if campana == 'grande' %}selected{% endif %}>Grande (enero a junio)</option>
+                <option value="chica" {% if campana == 'chica' %}selected{% endif %}>Chica (julio a diciembre)</option>
+            </select>
+        </div>
+        <div>
+            <label for="tipo">Tipo</label>
+            <select id="tipo" name="tipo">
+                <option value="">Todos</option>
+                {% for codigo, nombre in tipos.items() %}<option value="{{ codigo }}" {% if tipo == codigo %}selected{% endif %}>{{ nombre }}</option>{% endfor %}
+            </select>
+        </div>
+        <div style="flex:0; align-self:flex-end"><button type="submit" class="boton-secundario">Filtrar</button></div>
+    </div>
+</form>
+
+<div class="tarjeta">
+    <table class="tabla" id="tabla-eventos" data-paginacion="10">
+        <thead>
+            <tr><th>Fecha</th><th>Campaña</th><th>Tipo</th><th>Producto</th><th>Qué pasó</th><th>Impacto</th><th>No atendido</th><th>Acciones</th></tr>
+        </thead>
+        <tbody>
+            {% for e in eventos %}
+            <tr>
+                <td>{{ e.fecha_inicio.strftime('%d/%m/%Y') }}{% if e.fecha_fin %}<br><small>al {{ e.fecha_fin.strftime('%d/%m/%Y') }}</small>{% endif %}</td>
+                <td>{{ e.campana }}</td>
+                <td>{{ tipos[e.tipo].split(' (')[0] if e.tipo in tipos else e.tipo }}</td>
+                <td>{{ e.producto.nombre_producto if e.producto else 'Todo el negocio' }}{% if e.sede %}<br><small>{{ e.sede.nombre_sede }}</small>{% endif %}</td>
+                <td>{{ e.descripcion }}{% if e.es_ejemplo %} <span class="etiqueta etiqueta-inactivo" title="Solo de visualización: no afecta los cálculos">Ejemplo</span>{% endif %}</td>
+                <td>
+                    {% if e.impacto == 'alto' %}<span class="etiqueta etiqueta-alerta">Alto</span>
+                    {% elif e.impacto == 'medio' %}<span class="etiqueta etiqueta-pendiente">Medio</span>
+                    {% else %}<span class="etiqueta etiqueta-inactivo">Bajo</span>{% endif %}
+                </td>
+                <td>{{ e.cantidad_no_atendida if e.cantidad_no_atendida else '—' }}</td>
+                <td>
+                    <a href="{{ url_for('eventos.editar', id_evento=e.id_evento) }}" class="boton-secundario">Editar</a>
+                    <form method="POST" action="{{ url_for('eventos.eliminar', id_evento=e.id_evento) }}" style="display:inline"
+                          data-confirmar="¿Eliminar este evento?">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="boton-peligro">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="sin-resultados">Todavía no hay eventos registrados con esos filtros.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/paginacion.js') }}"></script>
+{% endblock %}

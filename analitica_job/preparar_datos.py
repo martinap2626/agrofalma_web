@@ -76,10 +76,12 @@ def filtrar_meses_no_confiables(df: pd.DataFrame) -> pd.DataFrame:
 # en esas filas cancela ventas reales a cero (ej. contado=22, credito=-22 -> 0). Mientras no se
 # confirme el significado real, se usa el mayor de los dos valores absolutos (no se pierde
 # evidencia de venta, pero tampoco se asume una interpretacion de negocio no confirmada).
+# La etiqueta "otro" (oct-dic 2025) tiene el mismo problema: 130 filas con credito = -contado
+# que se anulaban a cero aunque su total en soles es positivo.
 def calcular_unidades_vendidas(df: pd.DataFrame) -> pd.Series:
     contado = df["cantidad_contado"].fillna(0)
     credito = df["cantidad_credito"].fillna(0)
-    es_ambiguo = df["credito_signo_hoja"] == "mixto_negativo_positivo"
+    es_ambiguo = df["credito_signo_hoja"].isin(["mixto_negativo_positivo", "otro"])
 
     suma_normal = contado + credito
     maximo_seguro = pd.concat([contado, credito.abs()], axis=1).max(axis=1)

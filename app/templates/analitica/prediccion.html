@@ -11,6 +11,90 @@
     <h2>Predicción de demanda</h2>
 </div>
 
+{% if ejecucion %}
+<details class="tarjeta explicacion" open>
+    <summary>¿Cómo se calcula esta predicción y cómo leerla?</summary>
+    <p>
+        El sistema estima <strong>cuántas unidades de cada producto se venderán el próximo mes</strong>, a partir de las ventas
+        reales de la Sede Pimentel (enero 2023 en adelante, hasta {{ ejecucion.datos_hasta }}). Se agrupan los tamaños de un mismo
+        producto (por ejemplo 250 ML y 1 L) porque así hay más ventas por producto y el pronóstico es más estable.
+    </p>
+    <ul>
+        <li><strong>Cómo se calcula:</strong> se probaron 6 métodos pronosticando cada uno de los últimos 8 meses con
+            <em>solo</em> lo que se sabía antes de ese mes, y se eligió el que mejor acertó para cada clase de producto:
+            {% for clase, nombre in modelo.get('metodos', {}).items() %}
+            clase <strong>{{ clase }}</strong>: {{ nombre }}{{ '; ' if not loop.last else '.' }}
+            {% endfor %}
+        </li>
+        <li><strong>Cantidad sugerida a reponer:</strong> la demanda esperada del mes, redondeada hacia arriba. Con ella y con el
+            margen de seguridad se arman las <a href="{{ url_for('analitica.recomendaciones') }}">recomendaciones de abastecimiento</a>.</li>
+        <li><strong>Tendencia:</strong> compara lo pronosticado con lo que se vendió el mes pasado.</li>
+        <li><strong>Confiabilidad:</strong> qué tan bien acertó el método con <em>ese</em> producto en los últimos 8 meses:
+            <span class="etiqueta etiqueta-activo">Alta</span> (error bajo y ventas casi todos los meses),
+            <span class="etiqueta etiqueta-pendiente">Media</span>,
+            <span class="etiqueta etiqueta-alerta">Baja</span> (el producto se vende poco o de forma muy irregular).
+            {% set conf = modelo.get('confiabilidad', {}) %}
+            {% if conf %}Hoy: {{ conf.get('Alta', 0) }} productos con confiabilidad Alta, {{ conf.get('Media', 0) }} Media y {{ conf.get('Baja', 0) }} Baja.{% endif %}
+        </li>
+    </ul>
+    <p class="texto-ayuda">
+        Límite honesto: muchos productos se venden pocas veces al año, y eso hace imposible acertar al detalle cada mes.
+        Con confiabilidad Baja, tómalo solo como referencia; el sistema es más fiable para los productos de clase A.
+    </p>
+</details>
+<div class="tarjeta">
+    {% if predicciones %}
+    <table class="tabla" id="tabla-prediccion-real" data-paginacion="15">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Categoría</th>
+                <th>Clase</th>
+                <th>Mes pronosticado</th>
+                <th>Cantidad sugerida a reponer</th>
+                <th>Tendencia</th>
+                <th>Confiabilidad</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in predicciones %}
+            {% set clase = clases.get(p.id_producto) %}
+            <tr>
+                <td>{{ p.producto.nombre_producto }}{% if eventos_por_producto and p.id_producto in eventos_por_producto %} <span class="etiqueta etiqueta-pendiente" title="{{ eventos_por_producto[p.id_producto]|join(' | ') }}">Evento</span>{% endif %}</td>
+                <td>{{ p.producto.categoria.nombre_categoria }}</td>
+                <td>
+                    {% if clase == 'A' %}<span class="etiqueta etiqueta-activo">A</span>
+                    {% elif clase == 'B' %}<span class="etiqueta etiqueta-pendiente">B</span>
+                    {% elif clase == 'C' %}<span class="etiqueta etiqueta-inactivo">C</span>
+                    {% else %}<span class="etiqueta etiqueta-inactivo">—</span>{% endif %}
+                </td>
+                <td>{{ p.periodo_objetivo.strftime('%m/%Y') if p.periodo_objetivo else '—' }}</td>
+                <td>{{ p.demanda_estimada|round(0, 'ceil')|int }}</td>
+                <td>
+                    {% if p.venta_mes_anterior is none or p.venta_mes_anterior == 0 %}
+                    <span class="etiqueta etiqueta-inactivo">Sin ventas el mes pasado</span>
+                    {% elif p.tendencia_pct is none or p.tendencia_pct == 0 %}
+                    <span class="etiqueta etiqueta-inactivo">Estable</span>
+                    {% elif p.tendencia_pct > 0 %}
+                    <span class="etiqueta etiqueta-activo">▲ Sube {{ "%.0f"|format(p.tendencia_pct) }}% vs. mes pasado</span>
+                    {% else %}
+                    <span class="etiqueta etiqueta-alerta">▼ Baja {{ "%.0f"|format(p.tendencia_pct|abs) }}% vs. mes pasado</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if p.confiabilidad == 'Alta' %}<span class="etiqueta etiqueta-activo">Alta</span>
+                    {% elif p.confiabilidad == 'Media' %}<span class="etiqueta etiqueta-pendiente">Media</span>
+                    {% else %}<span class="etiqueta etiqueta-alerta">Baja</span>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="sin-resultados">No hay predicciones de demanda por ahora.</p>
+    {% endif %}
+</div>
+{% else %}
 <div class="tarjeta">
     {% if predicciones %}
     <table class="tabla" id="tabla-prediccion" data-paginacion="10">
@@ -62,7 +146,9 @@
     <p class="sin-resultados">No hay predicciones de demanda por ahora.</p>
     {% endif %}
 </div>
+{% endif %}
 
+{% if not ejecucion %}
 <div class="cabecera-pagina">
     <h2>Vista previa con datos reales del histórico</h2>
     <p class="texto-ayuda">
@@ -133,6 +219,7 @@
     <p class="sin-resultados">Vista previa no disponible por ahora.</p>
     {% endif %}
 </div>
+{% endif %}
 {% endblock %}
 
 {% block script_pie %}

@@ -46,12 +46,14 @@
                     {% if usuario.id_usuario != current_user.id_usuario %}
                         {% if usuario.estado %}
                         <form method="POST" action="{{ url_for('usuarios.desactivar', id_usuario=usuario.id_usuario) }}"
-                              onsubmit="return confirm('¿Desactivar a {{ usuario.nombre_completo }}?');" style="display:inline">
+                              data-confirmar="¿Desactivar a {{ usuario.nombre_completo }}?" style="display:inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="icono-accion" title="Desactivar">🗑️</button>
                         </form>
                         {% else %}
                         <form method="POST" action="{{ url_for('usuarios.reactivar', id_usuario=usuario.id_usuario) }}"
-                              onsubmit="return confirm('¿Reactivar a {{ usuario.nombre_completo }}?');" style="display:inline">
+                              data-confirmar="¿Reactivar a {{ usuario.nombre_completo }}?" style="display:inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="icono-accion" title="Reactivar">♻️</button>
                         </form>
                         {% endif %}

@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# servidor de producción (Windows y Linux). En Linux también puede usarse gunicorn: pip install gunicorn
+waitress==3.0.2

@@ -7,14 +7,26 @@ siguiendo la buena práctica descrita en el documento de proyecto.
 """
 
 import os
+from datetime import timedelta
+
 from dotenv import load_dotenv
 
 # Carga el archivo .env que esté en la raíz del proyecto (si existe)
 load_dotenv()
 
 
+# lee una variable de entorno booleana ("1", "true", "si" = verdadero)
+def _env_bool(nombre, por_defecto=False):
+    valor = os.environ.get(nombre)
+    if valor is None:
+        return por_defecto
+    return valor.strip().lower() in ("1", "true", "si", "sí", "yes")
+
+
 class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "cambiar-esta-clave-en-produccion")
+    # Sin valor por defecto a propósito: si falta, la app se niega a arrancar
+    # (ver create_app) en vez de funcionar con una clave conocida públicamente.
+    SECRET_KEY = os.environ.get("SECRET_KEY")
 
     DB_USER = os.environ.get("DB_USER", "agrofalma_app")
     DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
@@ -27,6 +39,29 @@ class Config:
         f"?charset=utf8mb4"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # revisa que la conexión siga viva antes de usarla y la renueva cada 30 min,
+    # para que un MySQL reiniciado o con conexiones inactivas cortadas no
+    # produzca errores al usuario
+    SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True, "pool_recycle": 1800}
 
-    # Sesión: expira la cookie de sesión cuando el navegador se cierra
-    SESSION_PERMANENT = False
+    # --- Sesión ---------------------------------------------------------
+    # La cookie no es accesible desde JavaScript, no viaja en peticiones
+    # entre sitios, y solo viaja por HTTPS cuando SESSION_COOKIE_SECURE=true
+    # (activarlo en el servidor de producción, que debe usar HTTPS).
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", False)
+    # la sesión caduca tras N minutos SIN actividad (se renueva en cada petición)
+    PERMANENT_SESSION_LIFETIME = timedelta(minutes=int(os.environ.get("SESION_INACTIVIDAD_MIN", "30")))
+
+    # --- Bloqueo por intentos de acceso fallidos --------------------------
+    LOGIN_MAX_INTENTOS = int(os.environ.get("LOGIN_MAX_INTENTOS", "5"))
+    LOGIN_VENTANA_MIN = int(os.environ.get("LOGIN_VENTANA_MIN", "15"))
+
+    # --- Detrás de un proxy inverso (nginx, etc.) --------------------------
+    # solo activar si de verdad hay un proxy de confianza delante; si no, un
+    # cliente podría falsear su IP con la cabecera X-Forwarded-For
+    CONFIAR_EN_PROXY = _env_bool("CONFIAR_EN_PROXY", False)
+
+    # --- Registro de errores en archivo -------------------------------------
+    LOG_ARCHIVO = os.environ.get("LOG_ARCHIVO", "logs/agrofalma.log")

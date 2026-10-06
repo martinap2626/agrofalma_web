@@ -6,25 +6,28 @@
     <title>{% block titulo %}Agrofalma y Consultores EIRL{% endblock %}</title>
     <link rel="icon" href="{{ url_for('static', filename='img/logo_agrofalma.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {# se carga ANTES de dibujar la página para que, si el modo privacidad estaba activo, los montos nunca lleguen a verse #}
+    <script src="{{ url_for('static', filename='js/privacidad.js') }}"></script>
 </head>
 <body>
+    <a href="#contenido-principal" class="saltar-contenido">Saltar al contenido principal</a>
     <div class="layout">
-        <aside class="sidebar">
+        <aside class="sidebar" aria-label="Menú principal">
             <div class="marca">
                 <img src="{{ url_for('static', filename='img/logo_agrofalma.png') }}"
                      alt="Agrofalma y Consultores EIRL" class="marca-logo">
             </div>
 
-            <nav class="menu">
+            <nav class="menu" aria-label="Módulos del sistema">
                 {% if current_user.is_authenticated and current_user.es_administrador %}
                 <a href="{{ url_for('dashboard.inicio') }}"
                    class="menu-item {% if request.endpoint == 'dashboard.inicio' %}activo{% endif %}">
                     <span>Dashboard</span>
                 </a>
                 {% endif %}
-                <a href="{{ url_for('ventas.listar') }}"
+                <a href="{{ url_for('ventas.listar') if current_user.is_authenticated and current_user.es_administrador else url_for('ventas.mis_ventas') }}"
                    class="menu-item {% if request.blueprint == 'ventas' %}activo{% endif %}">
-                    <span>Ventas consolidadas</span>
+                    <span>{{ 'Ventas consolidadas' if current_user.is_authenticated and current_user.es_administrador else 'Mis ventas' }}</span>
                 </a>
                 <a href="{{ url_for('productos.listar') }}"
                    class="menu-item {% if request.blueprint == 'productos' %}activo{% endif %}">
@@ -35,6 +38,10 @@
                    class="menu-item {% if request.blueprint == 'analitica' %}activo{% endif %}">
                     <span>Analítica comercial</span>
                 </a>
+                <a href="{{ url_for('eventos.listar') }}"
+                   class="menu-item {% if request.blueprint == 'eventos' %}activo{% endif %}">
+                    <span>Eventos del negocio</span>
+                </a>
                 <a href="{{ url_for('reportes.inicio') }}"
                    class="menu-item {% if request.blueprint == 'reportes' %}activo{% endif %}">
                     <span>Reportes</span>
@@ -43,13 +50,32 @@
                    class="menu-item {% if request.blueprint == 'usuarios' %}activo{% endif %}">
                     <span>Usuarios</span>
                 </a>
+                <a href="{{ url_for('auditoria.listar') }}"
+                   class="menu-item {% if request.blueprint == 'auditoria' %}activo{% endif %}">
+                    <span>Auditoría</span>
+                </a>
+                {% endif %}
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('ayuda.inicio') }}"
+                   class="menu-item {% if request.blueprint == 'ayuda' %}activo{% endif %}">
+                    <span>Ayuda</span>
+                </a>
                 {% endif %}
             </nav>
         </aside>
 
         <div class="contenido">
             <header class="topbar">
-                <div></div>
+                <div>
+                    {% if current_user.is_authenticated %}
+                    <button type="button" id="boton-privacidad" class="boton-privacidad" aria-pressed="false" hidden
+                            title="Oculta o muestra los montos de dinero en pantalla (atajo: Alt+P)">
+                        <svg class="privacidad-icono icono-ojo" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <svg class="privacidad-icono icono-ojo-tachado" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-7 0-11-7-11-7a19.8 19.8 0 0 1 5.06-5.94M9.9 4.24A10.9 10.9 0 0 1 12 5c7 0 11 7 11 7a19.8 19.8 0 0 1-3.17 4.19M14.12 14.12A3 3 0 1 1 9.88 9.88"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        <span class="privacidad-texto">Ocultar montos</span>
+                    </button>
+                    {% endif %}
+                </div>
                 {% if current_user.is_authenticated %}
                 <div class="usuario-actual">
                     <span class="usuario-rol">{{ current_user.rol.nombre_rol }}</span>
@@ -59,12 +85,12 @@
                 {% endif %}
             </header>
 
-            <main class="pagina">
+            <main class="pagina" id="contenido-principal" tabindex="-1">
                 {% with mensajes = get_flashed_messages(with_categories=true) %}
                     {% if mensajes %}
-                        <div class="mensajes">
+                        <div class="mensajes" role="status" aria-live="polite">
                             {% for categoria, mensaje in mensajes %}
-                                <div class="alerta alerta-{{ categoria }}">{{ mensaje }}</div>
+                                <div class="alerta alerta-{{ categoria }}" {% if categoria == 'danger' %}role="alert"{% endif %}>{{ mensaje }}</div>
                             {% endfor %}
                         </div>
                     {% endif %}
@@ -75,6 +101,7 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='js/confirmar.js') }}"></script>
     {% block script_pie %}{% endblock %}
 </body>
 </html>

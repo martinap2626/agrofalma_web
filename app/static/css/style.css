@@ -343,3 +343,77 @@ form input, form select, form textarea {
 @media (max-width: 720px) {
     .login-tarjeta { flex-direction: column; }
 }
+
+/* ---------------------------------------------------------------------
+   Diálogo de confirmación (js/confirmar.js)
+--------------------------------------------------------------------- */
+.dialogo-confirmar {
+    border: none;
+    border-radius: 10px;
+    padding: 24px;
+    max-width: 420px;
+    width: calc(100% - 32px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    color: var(--texto-principal);
+}
+.dialogo-confirmar::backdrop { background: rgba(20, 24, 21, 0.55); }
+.dialogo-mensaje { margin: 0 0 20px; font-size: 15px; line-height: 1.5; }
+.dialogo-acciones { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* enlace "saltar al contenido": invisible hasta que recibe foco con el teclado */
+.saltar-contenido {
+    position: absolute;
+    left: 8px;
+    top: -48px;
+    background: var(--verde-primario);
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 6px;
+    z-index: 100;
+}
+.saltar-contenido:focus { top: 8px; }
+
+.tabla .etiqueta { white-space: nowrap; }
+
+/* modo privacidad: difumina todo lo marcado como dinero (clase "monto"); se activa con el botón de la barra superior */
+.privado .monto { color: transparent !important; text-shadow: 0 0 10px rgba(30, 40, 33, 0.6); user-select: none; }
+.boton-privacidad {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #eef0ed; color: var(--texto-principal); border: 1px solid var(--borde);
+    border-radius: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+}
+.boton-privacidad[hidden] { display: none; }
+.boton-privacidad .icono-ojo-tachado { display: none; }
+.boton-privacidad[aria-pressed="true"] .icono-ojo { display: none; }
+.boton-privacidad[aria-pressed="true"] .icono-ojo-tachado { display: inline; }
+.boton-privacidad:hover { background: #e3e6e1; }
+.boton-privacidad[aria-pressed="true"] { background: var(--verde-primario); color: #fff; border-color: var(--verde-primario); }
+
+/* aviso "calculado el ..." bajo las pestañas de analítica */
+.estado-calculo { margin: 14px 0 6px; }
+
+/* bloques explicativos plegables de las pantallas de analítica */
+.explicacion { margin-bottom: 16px; }
+.explicacion summary { cursor: pointer; font-weight: 600; font-size: 15px; }
+.explicacion p, .explicacion li { line-height: 1.55; }
+.explicacion a { color: var(--verde-primario); text-decoration: underline; }
+
+/* centro de ayuda */
+.ayuda-indice { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; margin-bottom: 16px; }
+.ayuda-indice a { color: var(--verde-primario); text-decoration: underline; }
+.ayuda-seccion { margin-bottom: 16px; scroll-margin-top: 16px; }
+.ayuda-seccion h2 { margin-top: 0; font-size: 18px; }
+.ayuda-seccion li { margin-bottom: 6px; line-height: 1.5; }
+.ayuda-seccion details { border-bottom: 1px solid var(--borde); padding: 10px 0; }
+.ayuda-seccion summary { cursor: pointer; font-weight: 600; }
+.ayuda-seccion details p { margin: 8px 0 0; color: var(--texto-secundario); line-height: 1.5; }
+.ayuda-seccion dt { font-weight: 600; margin-top: 12px; }
+.ayuda-seccion dd { margin: 4px 0 0; color: var(--texto-secundario); line-height: 1.5; }
+
+/* foco visible para quien navega con teclado */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 3px solid var(--ambar);
+    outline-offset: 2px;
+}
+.casilla { display:flex; align-items:center; gap:8px; margin:10px 0; font-weight:normal; }
+.casilla input { width:auto; margin:0; }

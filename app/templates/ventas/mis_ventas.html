@@ -31,21 +31,21 @@
 <div class="grid-kpis">
     <div class="tarjeta tarjeta-kpi">
         <div class="etiqueta-kpi">Ventas al contado</div>
-        <div class="valor-kpi">S/ {{ "%.2f"|format(total_contado) }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "%.2f"|format(total_contado) }}</span></div>
         <div class="etiqueta-kpi">{{ cantidad_contado }} venta{{ 's' if cantidad_contado != 1 else '' }}</div>
     </div>
     <div class="tarjeta tarjeta-kpi">
         <div class="etiqueta-kpi">Ventas a crédito</div>
-        <div class="valor-kpi">S/ {{ "%.2f"|format(total_credito) }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "%.2f"|format(total_credito) }}</span></div>
         <div class="etiqueta-kpi">{{ cantidad_credito }} venta{{ 's' if cantidad_credito != 1 else '' }}</div>
     </div>
     <div class="tarjeta tarjeta-kpi">
         <div class="etiqueta-kpi">Recuperaciones registradas hoy</div>
-        <div class="valor-kpi">S/ {{ "%.2f"|format(recuperaciones_hoy) }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "%.2f"|format(recuperaciones_hoy) }}</span></div>
     </div>
     <div class="tarjeta tarjeta-kpi">
         <div class="etiqueta-kpi">Total del día ({{ ventas|length }} venta{{ 's' if ventas|length != 1 else '' }})</div>
-        <div class="valor-kpi">S/ {{ "%.2f"|format(total_contado + total_credito) }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "%.2f"|format(total_contado + total_credito) }}</span></div>
     </div>
 </div>
 
@@ -56,7 +56,7 @@
     </h2>
     {% if creditos_pendientes %}
     <p style="margin:-6px 0 10px;font-size:13px;color:var(--texto-secundario)">
-        Saldo pendiente total: S/ {{ "%.2f"|format(saldo_pendiente_total) }}
+        Saldo pendiente total: <span class="monto">S/ {{ "%.2f"|format(saldo_pendiente_total) }}</span>
     </p>
     <table class="tabla" id="tabla-mis-creditos" data-paginacion="5">
         <thead>
@@ -68,7 +68,7 @@
                 <td>{{ credito.venta.numero_operacion }}</td>
                 <td>{{ credito.venta.cliente.nombre_cliente }}</td>
                 <td>{{ credito.fecha_credito.strftime('%d/%m/%Y') }}</td>
-                <td>S/ {{ "%.2f"|format(credito.saldo_pendiente) }}</td>
+                <td><span class="monto">S/ {{ "%.2f"|format(credito.saldo_pendiente) }}</span></td>
                 <td>
                     {% if credito.estado_visual == 'parcial' %}
                     <span class="etiqueta etiqueta-parcial">Parcial</span>
@@ -137,7 +137,7 @@
                         {{ 'Crédito' if venta.es_credito else 'Contado' }}
                     </span>
                 </td>
-                <td>S/ {{ "%.2f"|format(venta.total) }}</td>
+                <td><span class="monto">S/ {{ "%.2f"|format(venta.total) }}</span></td>
                 <td>
                     <span class="etiqueta {{ 'etiqueta-activo' if venta.estado_pago == 'pagado' else 'etiqueta-pendiente' }}">
                         {{ 'Pagado' if venta.estado_pago == 'pagado' else 'Pendiente' }}

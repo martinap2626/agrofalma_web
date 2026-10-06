@@ -98,7 +98,7 @@
                         {{ 'Pagado' if venta.estado_pago == 'pagado' else 'Pendiente' }}
                     </span>
                 </td>
-                <td>S/ {{ "%.2f"|format(venta.total) }}</td>
+                <td><span class="monto">S/ {{ "%.2f"|format(venta.total) }}</span></td>
                 <td class="celda-acciones">
                     <a href="{{ url_for('ventas.detalle', id_venta=venta.id_venta) }}" class="icono-accion" title="Ver detalle">🔍</a>
                 </td>
@@ -110,6 +110,9 @@
             {% endfor %}
         </tbody>
     </table>
+    {% if limite_alcanzado %}
+    <p class="texto-ayuda">Se muestran las {{ limite_filas }} ventas más recientes de este filtro. Acota el rango de fechas para ver las demás.</p>
+    {% endif %}
 </div>
 {% endblock %}
 

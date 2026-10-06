@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block titulo %}No se pudo procesar el formulario{% endblock %}
+{% block contenido %}
+<div class="tarjeta tarjeta-error">
+    <h1>No se pudo procesar el formulario</h1>
+    <p>
+        La página estuvo abierta demasiado tiempo o tu sesión caducó, y por seguridad el sistema
+        no aceptó los datos. No se guardó ningún cambio.
+    </p>
+    <p class="texto-ayuda">Vuelve atrás, recarga la página e inténtalo de nuevo.</p>
+    <a href="{{ url_for('index') }}" class="boton-primario">Ir al inicio</a>
+</div>
+{% endblock %}

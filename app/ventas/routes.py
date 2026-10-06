@@ -9,21 +9,28 @@ Convenciones que siguen el mismo criterio que app/productos/routes.py:
 - Una venta ya registrada no se edita ni se elimina (es un comprobante).
 """
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, abort, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.extensions import db
+from app.decorators import rol_requerido
 from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
+from app.utilidades_fecha import rango_dia, rango_fechas
+from app.seguridad import leer_decimal, puede_ver_venta, registrar_accion, validar_largo
 from app.models import (
     Categoria, Cliente, Credito, DetalleVenta, Producto, Recuperacion, Sede, StockPorSede,
     Usuario, Venta,
 )
 
 bp = Blueprint("ventas", __name__, url_prefix="/ventas")
+
+# máximo de filas que una pantalla de listado dibuja de una vez (más que esto
+# no es legible, y cada fila cuesta tiempo de servidor y de navegador)
+LIMITE_FILAS = 500
 
 
 # ---------------------------------------------------------------------------
@@ -32,6 +39,7 @@ bp = Blueprint("ventas", __name__, url_prefix="/ventas")
 # consolidado de ventas de todas las sedes, con varios filtros (fecha, trabajador, categoria, sede)
 @bp.route("")
 @login_required
+@rol_requerido("Administrador")
 def listar():
     """
     HU-05 (RF-05): consolidado de ventas de todas las sedes, con filtro por
@@ -57,6 +65,11 @@ def listar():
     id_categoria = int(id_categoria_raw) if id_categoria_raw.isdigit() else None
     id_sede = int(id_sede_raw) if id_sede_raw.isdigit() else None
 
+    # sin ningún filtro de fechas, se muestran los últimos 30 días en vez de TODA la
+    # historia (que crece sin parar y volvería lenta la pantalla); el filtro lo refleja
+    if not desde and not hasta:
+        desde = date.today() - timedelta(days=30)
+
     contexto_filtros = {
         "busqueda": busqueda, "desde": desde, "hasta": hasta,
         "id_trabajador": id_trabajador, "id_categoria": id_categoria, "id_sede": id_sede,
@@ -67,7 +80,11 @@ def listar():
         categorias = Categoria.query.filter_by(estado=True).order_by(Categoria.nombre_categoria).all()
         sedes = Sede.query.filter_by(estado=True).order_by(Sede.nombre_sede).all()
 
-        consulta = Venta.query.join(Cliente)
+        # una sola consulta trae la venta con su cliente, trabajador y sede
+        # (sin esto, cada fila disparaba 2 consultas más: el clásico "N+1")
+        consulta = Venta.query.join(Cliente).options(
+            db.contains_eager(Venta.cliente), db.joinedload(Venta.usuario), db.joinedload(Venta.sede)
+        )
         if busqueda:
             consulta = consulta.filter(
                 db.or_(
@@ -76,9 +93,9 @@ def listar():
                 )
             )
         if desde:
-            consulta = consulta.filter(db.func.date(Venta.fecha_hora) >= desde)
+            consulta = consulta.filter(Venta.fecha_hora >= rango_fechas(desde, desde)[0])
         if hasta:
-            consulta = consulta.filter(db.func.date(Venta.fecha_hora) <= hasta)
+            consulta = consulta.filter(Venta.fecha_hora < rango_fechas(hasta, hasta)[1])
         if id_trabajador:
             consulta = consulta.filter(Venta.id_usuario == id_trabajador)
         if id_sede:
@@ -91,7 +108,10 @@ def listar():
                     .filter(Producto.id_categoria == id_categoria)
                 )
             )
-        ventas = consulta.order_by(Venta.fecha_hora.desc()).all()
+        # tope de filas en pantalla: las más recientes del filtro (el resto se ve acotando fechas)
+        ventas = consulta.order_by(Venta.fecha_hora.desc()).limit(LIMITE_FILAS + 1).all()
+        limite_alcanzado = len(ventas) > LIMITE_FILAS
+        ventas = ventas[:LIMITE_FILAS]
     except SQLAlchemyError as error:
         registrar_error_conexion("listar ventas", error)
         flash(MENSAJE_ERROR_CONEXION, "danger")
@@ -102,7 +122,7 @@ def listar():
 
     return render_template(
         "ventas/listar.html", ventas=ventas, trabajadores=trabajadores, categorias=categorias,
-        sedes=sedes, **contexto_filtros,
+        sedes=sedes, limite_filas=LIMITE_FILAS, limite_alcanzado=limite_alcanzado, **contexto_filtros,
     )
 
 
@@ -132,9 +152,11 @@ def mis_ventas():
     }
 
     try:
-        consulta = Venta.query.join(Cliente).filter(
+        inicio_dia, fin_dia = rango_dia(fecha_filtro)
+        consulta = Venta.query.join(Cliente).options(db.contains_eager(Venta.cliente)).filter(
             Venta.id_usuario == current_user.id_usuario,
-            db.func.date(Venta.fecha_hora) == fecha_filtro,
+            Venta.fecha_hora >= inicio_dia,
+            Venta.fecha_hora < fin_dia,
         )
         if busqueda:
             consulta = consulta.filter(
@@ -157,6 +179,7 @@ def mis_ventas():
         # porque hoy estés mirando otro día en el listado de ventas).
         creditos_pendientes = (
             Credito.query.join(Venta)
+            .options(db.contains_eager(Credito.venta).joinedload(Venta.cliente))
             .filter(Venta.id_usuario == current_user.id_usuario, Credito.estado == "pendiente")
             .order_by(Credito.fecha_credito.asc())
             .all()
@@ -204,8 +227,12 @@ def mis_ventas():
 @bp.route("/nueva", methods=["GET", "POST"])
 @login_required
 def nueva():
+    # la lista de clientes (cientos o miles de filas) solo se carga cuando hay que
+    # DIBUJAR el formulario; si la venta se guarda bien, se redirige y no hace falta
+    def cargar_clientes():
+        return Cliente.query.filter_by(estado=True).order_by(Cliente.nombre_cliente).all()
+
     try:
-        clientes = Cliente.query.filter_by(estado=True).order_by(Cliente.nombre_cliente).all()
         productos = Producto.query.filter_by(estado=True).order_by(Producto.nombre_producto).all()
         stock_sede = {
             s.id_producto: s.cantidad_actual
@@ -214,11 +241,15 @@ def nueva():
     except SQLAlchemyError as error:
         registrar_error_conexion("abrir formulario de nueva venta", error)
         flash(MENSAJE_ERROR_CONEXION, "danger")
-        return redirect(url_for("ventas.listar"))
+        return redirect(url_for("ventas.mis_ventas"))
 
     if request.method == "POST":
         try:
             venta = _registrar_venta(request.form, productos, stock_sede)
+            registrar_accion(
+                "venta_registrada", "venta", venta.id_venta,
+                f"{venta.numero_operacion} ({venta.tipo_venta}) total S/ {venta.total}",
+            )
             flash(f'Venta "{venta.numero_operacion}" registrada correctamente.', "success")
             return redirect(url_for("ventas.detalle", id_venta=venta.id_venta))
         except _ErrorValidacionVenta as error:
@@ -228,13 +259,20 @@ def nueva():
             registrar_error_conexion("registrar venta", error)
             flash(MENSAJE_ERROR_CONEXION, "danger")
             return render_template(
-                "ventas/nueva.html", clientes=clientes, productos=productos, stock_sede=stock_sede, valores=request.form
+                "ventas/nueva.html", clientes=[], productos=productos, stock_sede=stock_sede, valores=request.form
             ), 503
 
         return render_template(
-            "ventas/nueva.html", clientes=clientes, productos=productos, stock_sede=stock_sede, valores=request.form
+            "ventas/nueva.html", clientes=cargar_clientes(), productos=productos, stock_sede=stock_sede,
+            valores=request.form,
         )
 
+    try:
+        clientes = cargar_clientes()
+    except SQLAlchemyError as error:
+        registrar_error_conexion("abrir formulario de nueva venta", error)
+        flash(MENSAJE_ERROR_CONEXION, "danger")
+        return redirect(url_for("ventas.mis_ventas"))
     return render_template("ventas/nueva.html", clientes=clientes, productos=productos, stock_sede=stock_sede, valores=None)
 
 
@@ -247,7 +285,11 @@ def detalle(id_venta):
     except SQLAlchemyError as error:
         registrar_error_conexion("ver detalle de venta", error)
         flash(MENSAJE_ERROR_CONEXION, "danger")
-        return redirect(url_for("ventas.listar"))
+        return redirect(url_for("ventas.mis_ventas"))
+
+    # un Trabajador solo puede ver el detalle de las ventas que él registró
+    if not puede_ver_venta(venta):
+        abort(403)
 
     return render_template("ventas/detalle.html", venta=venta)
 
@@ -272,6 +314,7 @@ def _registrar_venta(form, productos, stock_sede):
     id_cliente_raw = form.get("id_cliente", "")
     tipo_venta = form.get("tipo_venta", "contado")
     observaciones = form.get("observaciones", "").strip() or None
+    validar_largo(errores, observaciones, 150, "Las observaciones")
 
     cliente = Cliente.query.get(id_cliente_raw) if id_cliente_raw.isdigit() else None
     if cliente is None or not cliente.estado:
@@ -300,16 +343,14 @@ def _registrar_venta(form, productos, stock_sede):
 
         try:
             cantidad = int(cantidad_raw)
-            if cantidad <= 0:
+            if cantidad <= 0 or cantidad > 1_000_000:
                 raise ValueError
         except (ValueError, TypeError):
             errores.append(f'La cantidad de "{producto.nombre_producto}" debe ser un número mayor a 0.')
             continue
 
         try:
-            precio_unitario = Decimal(precio_raw) if precio_raw else producto.precio_unitario
-            if precio_unitario < 0:
-                raise InvalidOperation
+            precio_unitario = leer_decimal(precio_raw) if precio_raw else producto.precio_unitario
         except (InvalidOperation, ValueError):
             errores.append(f'El precio de "{producto.nombre_producto}" no es válido.')
             continue
@@ -412,6 +453,7 @@ def nuevo_cliente():
             db.session.add(cliente)
             try:
                 db.session.commit()
+                registrar_accion("cliente_creado", "cliente", cliente.id_cliente, cliente.nombre_cliente)
                 flash(f'Cliente "{cliente.nombre_cliente}" registrado correctamente.', "success")
                 return redirect(url_for("ventas.listar_clientes"))
             except SQLAlchemyError as error:
@@ -445,6 +487,7 @@ def editar_cliente(id_cliente):
                 setattr(cliente, campo, valor)
             try:
                 db.session.commit()
+                registrar_accion("cliente_editado", "cliente", cliente.id_cliente, cliente.nombre_cliente)
                 flash(f'Cliente "{cliente.nombre_cliente}" actualizado correctamente.', "success")
                 return redirect(url_for("ventas.listar_clientes"))
             except SQLAlchemyError as error:
@@ -472,6 +515,7 @@ def desactivar_cliente(id_cliente):
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return redirect(url_for("ventas.listar_clientes"))
 
+    registrar_accion("cliente_desactivado", "cliente", cliente.id_cliente, cliente.nombre_cliente)
     flash(f'Cliente "{cliente.nombre_cliente}" desactivado.', "success")
     return redirect(url_for("ventas.listar_clientes"))
 
@@ -489,6 +533,7 @@ def reactivar_cliente(id_cliente):
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return redirect(url_for("ventas.listar_clientes"))
 
+    registrar_accion("cliente_reactivado", "cliente", cliente.id_cliente, cliente.nombre_cliente)
     flash(f'Cliente "{cliente.nombre_cliente}" reactivado.', "success")
     return redirect(url_for("ventas.listar_clientes"))
 
@@ -503,6 +548,9 @@ def _validar_formulario_cliente(form):
 
     if not nombre:
         errores.append("El nombre del cliente es obligatorio.")
+    validar_largo(errores, nombre, 100, "El nombre del cliente")
+    validar_largo(errores, documento, 15, "El documento")
+    validar_largo(errores, telefono, 15, "El teléfono")
 
     datos = {
         "nombre_cliente": nombre,
@@ -522,16 +570,25 @@ def listar_creditos():
     filtro_estado = request.args.get("estado", "").strip()
 
     try:
-        consulta = Credito.query.join(Venta)
+        consulta = Credito.query.join(Venta).options(
+            db.contains_eager(Credito.venta).joinedload(Venta.cliente)
+        )
+        if not current_user.es_administrador:
+            consulta = consulta.filter(Venta.id_usuario == current_user.id_usuario)
         if filtro_estado in ("pendiente", "pagado"):
             consulta = consulta.filter(Credito.estado == filtro_estado)
-        creditos = consulta.order_by(Credito.fecha_credito.desc()).all()
+        creditos = consulta.order_by(Credito.fecha_credito.desc()).limit(LIMITE_FILAS + 1).all()
+        limite_alcanzado = len(creditos) > LIMITE_FILAS
+        creditos = creditos[:LIMITE_FILAS]
     except SQLAlchemyError as error:
         registrar_error_conexion("listar créditos", error)
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return render_template("creditos/listar.html", creditos=[], filtro_estado=filtro_estado), 503
 
-    return render_template("creditos/listar.html", creditos=creditos, filtro_estado=filtro_estado)
+    return render_template(
+        "creditos/listar.html", creditos=creditos, filtro_estado=filtro_estado,
+        limite_filas=LIMITE_FILAS, limite_alcanzado=limite_alcanzado,
+    )
 
 
 # muestra un credito puntual junto con los pagos que ya se le hicieron
@@ -544,6 +601,9 @@ def detalle_credito(id_credito):
         registrar_error_conexion("ver detalle de crédito", error)
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return redirect(url_for("ventas.listar_creditos"))
+
+    if not puede_ver_venta(credito.venta):
+        abort(403)
 
     return render_template("creditos/detalle.html", credito=credito)
 
@@ -559,10 +619,13 @@ def registrar_pago(id_credito):
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return redirect(url_for("ventas.listar_creditos"))
 
+    if not puede_ver_venta(credito.venta):
+        abort(403)
+
     monto_raw = request.form.get("monto_recuperado", "")
 
     try:
-        monto = Decimal(monto_raw)
+        monto = leer_decimal(monto_raw)
     except (InvalidOperation, ValueError):
         flash("El monto ingresado no es válido.", "danger")
         return redirect(url_for("ventas.detalle_credito", id_credito=id_credito))
@@ -596,5 +659,9 @@ def registrar_pago(id_credito):
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return redirect(url_for("ventas.detalle_credito", id_credito=id_credito)), 503
 
+    registrar_accion(
+        "pago_registrado", "credito", credito.id_credito,
+        f"S/ {monto} al crédito de {credito.venta.numero_operacion}; saldo S/ {credito.saldo_pendiente}",
+    )
     flash("Pago registrado correctamente.", "success")
     return redirect(url_for("ventas.detalle_credito", id_credito=id_credito))

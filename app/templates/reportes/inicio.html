@@ -51,7 +51,7 @@
     </div>
     <div class="tarjeta tarjeta-kpi">
         <div class="etiqueta-kpi">Total vendido en el periodo</div>
-        <div class="valor-kpi">S/ {{ "%.2f"|format(resumen_productos.total) }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "%.2f"|format(resumen_productos.total) }}</span></div>
     </div>
 </div>
 
@@ -67,7 +67,7 @@
                 <td>{{ fila.producto }}</td>
                 <td>{{ fila.categoria }}</td>
                 <td>{{ fila.cantidad }}</td>
-                <td>S/ {{ "%.2f"|format(fila.total) }}</td>
+                <td><span class="monto">S/ {{ "%.2f"|format(fila.total) }}</span></td>
             </tr>
             {% else %}
             <tr><td colspan="5" class="sin-resultados">No hay ventas registradas en este periodo.</td></tr>
@@ -84,15 +84,15 @@
     </div>
     <div class="tarjeta tarjeta-kpi">
         <div class="etiqueta-kpi">Total del periodo</div>
-        <div class="valor-kpi">S/ {{ "%.2f"|format(resumen_ventas.total) }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "%.2f"|format(resumen_ventas.total) }}</span></div>
     </div>
     <div class="tarjeta tarjeta-kpi">
         <div class="etiqueta-kpi">Al contado</div>
-        <div class="valor-kpi">S/ {{ "%.2f"|format(resumen_ventas.contado) }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "%.2f"|format(resumen_ventas.contado) }}</span></div>
     </div>
     <div class="tarjeta tarjeta-kpi">
         <div class="etiqueta-kpi">A crédito</div>
-        <div class="valor-kpi">S/ {{ "%.2f"|format(resumen_ventas.credito) }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "%.2f"|format(resumen_ventas.credito) }}</span></div>
     </div>
 </div>
 
@@ -117,7 +117,7 @@
                         {{ 'Crédito' if venta.es_credito else 'Contado' }}
                     </span>
                 </td>
-                <td>S/ {{ "%.2f"|format(venta.total) }}</td>
+                <td><span class="monto">S/ {{ "%.2f"|format(venta.total) }}</span></td>
             </tr>
             {% else %}
             <tr><td colspan="6" class="sin-resultados">No hay ventas registradas en este periodo.</td></tr>

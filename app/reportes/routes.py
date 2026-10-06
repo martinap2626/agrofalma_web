@@ -24,6 +24,8 @@ from app.decorators import rol_requerido
 from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
 from app.extensions import db
 from app.models import Categoria, DetalleVenta, Producto, Sede, Venta
+from app.seguridad import registrar_accion
+from app.utilidades_fecha import rango_fechas
 
 bp = Blueprint("reportes", __name__, url_prefix="/reportes")
 
@@ -54,6 +56,13 @@ def inicio():
     return render_template("reportes/inicio.html", **contexto)
 
 
+# Excel interpreta como fórmula un texto que empieza con = + - @ (inyección de fórmulas en CSV): un nombre de cliente o de
+# producto malicioso podría ejecutar algo al abrir el archivo. Se antepone una comilla para que se lea como texto.
+def _texto_seguro(valor):
+    texto = str(valor)
+    return "'" + texto if texto[:1] in ("=", "+", "-", "@", "\t", "\r") else texto
+
+
 # genera el mismo reporte pero como archivo csv para descargar
 @bp.route("/exportar")
 @login_required
@@ -72,16 +81,16 @@ def exportar():
             productos, _ = _reporte_productos(desde, hasta, id_sede)
             escritor.writerow(["Producto", "Categoría", "Cantidad vendida", "Total vendido (S/)"])
             for p in productos:
-                escritor.writerow([p["producto"], p["categoria"], p["cantidad"], f'{p["total"]:.2f}'])
+                escritor.writerow([_texto_seguro(p["producto"]), _texto_seguro(p["categoria"]), p["cantidad"], f'{p["total"]:.2f}'])
         else:
             ventas, _ = _reporte_ventas(desde, hasta, id_sede)
             escritor.writerow(["N° Operación", "Fecha", "Cliente", "Sede", "Tipo", "Total (S/)"])
             for v in ventas:
                 escritor.writerow([
-                    v.numero_operacion,
+                    _texto_seguro(v.numero_operacion),
                     v.fecha_hora.strftime("%d/%m/%Y %H:%M"),
-                    v.cliente.nombre_cliente,
-                    v.sede.nombre_sede,
+                    _texto_seguro(v.cliente.nombre_cliente),
+                    _texto_seguro(v.sede.nombre_sede),
                     "Crédito" if v.es_credito else "Contado",
                     f"{v.total:.2f}",
                 ])
@@ -102,6 +111,7 @@ def exportar():
     # delimitador ';' ya alcanza para que Excel en configuración regional
     # en español separe columnas correctamente sin ese aviso adicional.
     contenido = chr(0xFEFF) + salida.getvalue()
+    registrar_accion("reporte_exportado", "reporte", tipo, f"{nombre_archivo}")
     return Response(
         contenido,
         mimetype="text/csv",
@@ -135,19 +145,29 @@ def _leer_filtros(args):
 
 # arma el listado y el resumen de ventas para el rango de fechas pedido
 def _reporte_ventas(desde, hasta, id_sede):
-    consulta = Venta.query.options(
-        db.joinedload(Venta.cliente), db.joinedload(Venta.sede)
-    ).filter(db.func.date(Venta.fecha_hora).between(desde, hasta))
+    inicio, fin = rango_fechas(desde, hasta)
+    filtro = [Venta.fecha_hora >= inicio, Venta.fecha_hora < fin]
     if id_sede:
-        consulta = consulta.filter(Venta.id_sede == id_sede)
-    ventas = consulta.order_by(Venta.fecha_hora).all()
+        filtro.append(Venta.id_sede == id_sede)
 
-    resumen = {
-        "cantidad": len(ventas),
-        "total": sum((v.total for v in ventas), Decimal("0")),
-        "contado": sum((v.total for v in ventas if v.tipo_venta == "contado"), Decimal("0")),
-        "credito": sum((v.total for v in ventas if v.tipo_venta == "credito"), Decimal("0")),
+    # el resumen lo calcula MySQL sobre TODAS las ventas del rango...
+    por_tipo = {
+        tipo: (int(n), Decimal(total or 0))
+        for tipo, n, total in db.session.query(Venta.tipo_venta, db.func.count(), db.func.sum(Venta.total))
+        .filter(*filtro).group_by(Venta.tipo_venta).all()
     }
+    resumen = {
+        "cantidad": sum(n for n, _ in por_tipo.values()),
+        "total": sum((t for _, t in por_tipo.values()), Decimal("0")),
+        "contado": por_tipo.get("contado", (0, Decimal("0")))[1],
+        "credito": por_tipo.get("credito", (0, Decimal("0")))[1],
+    }
+
+    # ...y el detalle trae las filas con cliente y sede ya cargados
+    ventas = (
+        Venta.query.options(db.joinedload(Venta.cliente), db.joinedload(Venta.sede))
+        .filter(*filtro).order_by(Venta.fecha_hora).all()
+    )
     return ventas, resumen
 
 
@@ -161,7 +181,7 @@ def _reporte_productos(desde, hasta, id_sede):
         .join(DetalleVenta, DetalleVenta.id_producto == Producto.id_producto)
         .join(Categoria, Categoria.id_categoria == Producto.id_categoria)
         .join(Venta, Venta.id_venta == DetalleVenta.id_venta)
-        .filter(db.func.date(Venta.fecha_hora).between(desde, hasta))
+        .filter(Venta.fecha_hora >= rango_fechas(desde, hasta)[0], Venta.fecha_hora < rango_fechas(desde, hasta)[1])
     )
     if id_sede:
         consulta = consulta.filter(Venta.id_sede == id_sede)

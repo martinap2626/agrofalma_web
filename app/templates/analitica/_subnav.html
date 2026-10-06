@@ -3,6 +3,11 @@
        class="boton-secundario {% if request.endpoint == 'analitica.recomendaciones' %}activo{% endif %}">Recomendaciones</a>
     <a href="{{ url_for('analitica.prediccion') }}"
        class="boton-secundario {% if request.endpoint == 'analitica.prediccion' %}activo{% endif %}">Predicción de demanda</a>
+    <a href="{{ url_for('analitica.campana') }}"
+       class="boton-secundario {% if request.endpoint == 'analitica.campana' %}activo{% endif %}">Plan de campaña</a>
+    <a href="{{ url_for('analitica.simulador') }}"
+       class="boton-secundario {% if request.endpoint == 'analitica.simulador' %}activo{% endif %}">Simulador</a>
     <a href="{{ url_for('analitica.segmentacion') }}"
        class="boton-secundario {% if request.endpoint == 'analitica.segmentacion' %}activo{% endif %}">Segmentación ABC</a>
 </div>
+{% include "analitica/_estado_calculo.html" %}

@@ -21,6 +21,32 @@
     </div>
 </div>
 
+{% if ejecucion %}
+<details class="tarjeta explicacion" open>
+    <summary>¿Cómo se calcula la clase y para qué sirve?</summary>
+    <p>
+        Se suman las <strong>ventas en soles de los últimos 12 meses</strong> de cada producto, se ordenan de mayor a menor y se van
+        acumulando (regla de Pareto 80/15/5): los primeros que juntan el 80% de las ventas son clase <strong>A</strong>, los que
+        completan hasta el 95% son <strong>B</strong> y el resto son <strong>C</strong>. Los productos sin ventas en el periodo quedan en C.
+        Así, todos los productos del catálogo tienen una clase.
+    </p>
+    <table class="tabla">
+        <thead><tr><th>Clase</th><th>Qué significa</th><th>Cómo se usa en las recomendaciones de abastecimiento</th></tr></thead>
+        <tbody>
+            <tr><td><span class="etiqueta etiqueta-activo">A</span></td><td>Pocos productos que concentran la mayor parte de las ventas</td>
+                <td>Máxima protección contra quedarse sin stock; se marcan Urgentes antes que los demás; reponer primero</td></tr>
+            <tr><td><span class="etiqueta etiqueta-pendiente">B</span></td><td>Peso intermedio</td>
+                <td>Protección media; seguimiento periódico</td></tr>
+            <tr><td><span class="etiqueta etiqueta-inactivo">C</span></td><td>Muchos productos de poco movimiento</td>
+                <td>Protección mínima y margen limitado, para no comprar de más ni acumular mercadería parada</td></tr>
+        </tbody>
+    </table>
+    <p class="texto-ayuda">
+        Calculado con las ventas de la Sede Pimentel. La clase de cada producto cambia si cambian sus ventas: se recalcula cada vez
+        que se actualiza la analítica.
+    </p>
+</details>
+{% endif %}
 <div class="tarjeta">
     {% if segmentaciones %}
     <table class="tabla" id="tabla-segmentacion" data-paginacion="10">
@@ -41,7 +67,7 @@
                 <td>{{ s.producto.nombre_producto }}</td>
                 <td>{{ s.producto.categoria.nombre_categoria }}</td>
                 <td>{{ s.periodo_inicio.strftime('%m/%Y') }} – {{ s.periodo_fin.strftime('%m/%Y') }}</td>
-                <td>S/ {{ "%.2f"|format(s.ventas_periodo) }}</td>
+                <td><span class="monto">S/ {{ "%.2f"|format(s.ventas_periodo) }}</span></td>
                 <td>{{ "%.2f"|format(s.pct_acumulado) }}%</td>
                 <td>
                     {% if s.clase_abc == 'A' %}
@@ -62,6 +88,7 @@
     {% endif %}
 </div>
 
+{% if not ejecucion %}
 <div class="cabecera-pagina">
     <h2>Vista previa con datos reales del histórico</h2>
     <p class="texto-ayuda">
@@ -90,7 +117,7 @@
                 <td>{{ s.producto_normalizado }}</td>
                 <td>{{ s.categoria }}</td>
                 <td>{{ s.periodo_inicio }} – {{ s.periodo_fin }}</td>
-                <td>S/ {{ "%.2f"|format(s.ventas_periodo) }}</td>
+                <td><span class="monto">S/ {{ "%.2f"|format(s.ventas_periodo) }}</span></td>
                 <td>{{ "%.2f"|format(s.pct_acumulado) }}%</td>
                 <td>
                     {% if s.clase_abc == 'A' %}
@@ -109,6 +136,7 @@
     <p class="sin-resultados">Vista previa no disponible por ahora.</p>
     {% endif %}
 </div>
+{% endif %}
 {% endblock %}
 
 {% block script_pie %}

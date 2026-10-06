@@ -3,13 +3,16 @@ from app.extensions import db
 
 class PrediccionDemanda(db.Model):
     """
-    Predicción de demanda precalculada por producto (HU-09, Sprint 3).
+    Predicción de demanda precalculada por producto base (HU-09).
 
-    No se genera aquí: la llena un job de analítica aparte (modelo de
-    predicción de demanda). Esta clase solo la lee. Mientras ese modelo no
-    esté implementado, la tabla contiene valores de referencia (incluido
-    `mape`) para probar la interfaz y su visualización -- no representan
-    el resultado real de evaluación del objetivo específico 1 de la tesis.
+    No se genera en la aplicación: la escribe el pipeline de analítica
+    (`flask actualizar-analitica`, ver analitica_job/pipeline) y esta clase solo la
+    lee. Cada ejecución agrega una fila por producto; la pantalla muestra la más
+    reciente de cada uno, y las anteriores quedan como historial.
+
+    Las columnas `periodo_objetivo`, `venta_mes_anterior`, `confiabilidad`, `metodo`
+    y `error_validacion` las agrega `flask preparar-analitica` (la tabla original
+    solo tenía horizonte, demanda, mape y tendencia).
     """
 
     __tablename__ = "predicciones_demanda"
@@ -21,6 +24,13 @@ class PrediccionDemanda(db.Model):
     demanda_estimada = db.Column(db.Numeric(10, 2), nullable=False)
     mape = db.Column(db.Numeric(5, 2))
     tendencia_pct = db.Column(db.Numeric(5, 2))
+
+    # --- agregadas por el pipeline real ---------------------------------------------
+    periodo_objetivo = db.Column(db.Date)                  # mes que se pronostica (primer día)
+    venta_mes_anterior = db.Column(db.Numeric(10, 2))      # unidades vendidas el último mes con datos
+    confiabilidad = db.Column(db.String(10))               # Alta | Media | Baja (lenguaje de negocio)
+    metodo = db.Column(db.String(30))                      # método de pronóstico usado
+    error_validacion = db.Column(db.Numeric(6, 2))         # error % del método en la validación (WAPE del producto)
 
     producto = db.relationship("Producto")
 

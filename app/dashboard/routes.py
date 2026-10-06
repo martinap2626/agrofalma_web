@@ -21,11 +21,12 @@ from flask_login import login_required
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.decorators import rol_requerido
+from app.utilidades_fecha import rango_mes
 from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
 from app.extensions import db
 from app.models import (
-    Categoria, Credito, DetalleVenta, Producto, RecomendacionAbastecimiento, Recuperacion, Sede,
-    StockPorSede, Usuario, Venta,
+    Categoria, Credito, DetalleVenta, EventoNegocio, PrediccionDemanda, Producto, RecomendacionAbastecimiento, Recuperacion,
+    SegmentacionProducto, Sede, StockPorSede, Usuario, Venta,
 )
 
 bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
@@ -44,6 +45,8 @@ def inicio():
     hoy = date.today()
     try:
         anio, mes = (int(parte) for parte in request.args.get("mes", "").split("-"))
+        if not (1 <= mes <= 12 and 2000 <= anio <= 2100):
+            raise ValueError  # mes o año imposibles: se usa el mes actual
     except ValueError:
         anio, mes = hoy.year, hoy.month
 
@@ -55,26 +58,32 @@ def inicio():
     }
 
     try:
-        consulta_ventas = Venta.query.filter(
-            db.extract("year", Venta.fecha_hora) == anio,
-            db.extract("month", Venta.fecha_hora) == mes,
+        # rango [inicio, fin) del mes: sargable, aprovecha el índice por fecha
+        inicio_mes, fin_mes = rango_mes(anio, mes)
+
+        # los totales los suma MySQL (una fila por tipo de venta), no Python sobre miles de filas
+        consulta_ventas = db.session.query(Venta.tipo_venta, db.func.sum(Venta.total)).filter(
+            Venta.fecha_hora >= inicio_mes, Venta.fecha_hora < fin_mes,
         )
         if id_sede:
             consulta_ventas = consulta_ventas.filter(Venta.id_sede == id_sede)
-        ventas_mes = consulta_ventas.all()
+        totales_por_tipo = dict(consulta_ventas.group_by(Venta.tipo_venta).all())
 
-        ventas_contado = sum((v.total for v in ventas_mes if v.tipo_venta == "contado"), Decimal("0"))
-        ventas_credito = sum((v.total for v in ventas_mes if v.tipo_venta == "credito"), Decimal("0"))
+        ventas_contado = Decimal(totales_por_tipo.get("contado") or 0)
+        ventas_credito = Decimal(totales_por_tipo.get("credito") or 0)
 
-        consulta_recuperaciones = Recuperacion.query.join(Credito).join(Venta).filter(
-            db.extract("year", Recuperacion.fecha_recuperacion) == anio,
-            db.extract("month", Recuperacion.fecha_recuperacion) == mes,
+        consulta_recuperaciones = (
+            db.session.query(db.func.coalesce(db.func.sum(Recuperacion.monto_recuperado), 0))
+            .join(Credito, Credito.id_credito == Recuperacion.id_credito)
+            .join(Venta, Venta.id_venta == Credito.id_venta)
+            .filter(
+                Recuperacion.fecha_recuperacion >= inicio_mes.date(),
+                Recuperacion.fecha_recuperacion < fin_mes.date(),
+            )
         )
         if id_sede:
             consulta_recuperaciones = consulta_recuperaciones.filter(Venta.id_sede == id_sede)
-        recuperaciones_mes = sum(
-            (r.monto_recuperado for r in consulta_recuperaciones.all()), Decimal("0")
-        )
+        recuperaciones_mes = Decimal(consulta_recuperaciones.scalar() or 0)
 
         consulta_categoria = (
             db.session.query(Categoria.nombre_categoria, db.func.sum(DetalleVenta.subtotal))
@@ -82,8 +91,8 @@ def inicio():
             .join(DetalleVenta, DetalleVenta.id_producto == Producto.id_producto)
             .join(Venta, Venta.id_venta == DetalleVenta.id_venta)
             .filter(
-                db.extract("year", Venta.fecha_hora) == anio,
-                db.extract("month", Venta.fecha_hora) == mes,
+                Venta.fecha_hora >= inicio_mes,
+                Venta.fecha_hora < fin_mes,
             )
         )
         if id_sede:
@@ -94,8 +103,8 @@ def inicio():
             db.session.query(Usuario.nombre, Usuario.apellido, db.func.sum(Venta.total))
             .join(Venta, Venta.id_usuario == Usuario.id_usuario)
             .filter(
-                db.extract("year", Venta.fecha_hora) == anio,
-                db.extract("month", Venta.fecha_hora) == mes,
+                Venta.fecha_hora >= inicio_mes,
+                Venta.fecha_hora < fin_mes,
             )
         )
         if id_sede:
@@ -140,8 +149,8 @@ def inicio():
             .join(DetalleVenta, DetalleVenta.id_producto == Producto.id_producto)
             .join(Venta, Venta.id_venta == DetalleVenta.id_venta)
             .filter(
-                db.extract("year", Venta.fecha_hora) == anio,
-                db.extract("month", Venta.fecha_hora) == mes,
+                Venta.fecha_hora >= inicio_mes,
+                Venta.fecha_hora < fin_mes,
             )
         )
         if id_sede:
@@ -159,8 +168,32 @@ def inicio():
             "dashboard/inicio.html", sedes=sedes, id_sede=id_sede, anio=anio, mes=mes, **valores_vacios
         ), 503
 
+    # panorama de la analítica (pronóstico, clases ABC, reposición y eventos): se omite sin romper el dashboard si falla
+    panorama = None
+    try:
+        clases = dict(db.session.query(SegmentacionProducto.clase_abc, db.func.count()).group_by(SegmentacionProducto.clase_abc).all())
+        niveles = dict(db.session.query(RecomendacionAbastecimiento.nivel_urgencia, db.func.count())
+                       .group_by(RecomendacionAbastecimiento.nivel_urgencia).all())
+        total_pronostico = db.session.query(db.func.sum(RecomendacionAbastecimiento.demanda_prevista)).scalar()
+        periodo = db.session.query(db.func.max(PrediccionDemanda.periodo_objetivo)).scalar()
+        top = (RecomendacionAbastecimiento.query.join(Producto).options(db.joinedload(RecomendacionAbastecimiento.producto))
+               .order_by(RecomendacionAbastecimiento.demanda_prevista.desc()).limit(5).all())
+        eventos = (EventoNegocio.query.options(db.joinedload(EventoNegocio.producto))
+                   .order_by(EventoNegocio.fecha_inicio.desc()).limit(5).all())
+        if clases or niveles:
+            panorama = {
+                "periodo": periodo, "pronostico_total": float(total_pronostico or 0), "clases": clases,
+                "urgentes": niveles.get("urgente", 0), "medias": niveles.get("media", 0),
+                "top": [(r.producto.nombre_producto, float(r.demanda_prevista), r.clase_abc) for r in top],
+                "eventos": [(e.fecha_inicio, e.producto.nombre_producto if e.producto else "Todo el negocio", ("[Ejemplo] " if e.es_ejemplo else "") + e.descripcion) for e in eventos],
+            }
+    except SQLAlchemyError as error:
+        registrar_error_conexion("cargar panorama analitico del dashboard", error)
+        db.session.rollback()
+
     return render_template(
         "dashboard/inicio.html",
+        panorama=panorama,
         sedes=sedes,
         id_sede=id_sede,
         anio=anio,

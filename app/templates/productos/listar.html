@@ -32,9 +32,9 @@
             {% for producto in productos %}
             <tr data-filtro="{{ producto.nombre_producto|lower }}">
                 <td>{{ loop.index }}</td>
-                <td>{{ producto.nombre_producto }}</td>
+                <td>{{ producto.nombre_producto }}{% if producto.descripcion %}<div class="texto-ayuda" style="margin:2px 0 0">{{ producto.descripcion }}</div>{% endif %}</td>
                 <td>{{ producto.categoria.nombre_categoria }}</td>
-                <td>S/ {{ "%.2f"|format(producto.precio_unitario) }}</td>
+                <td><span class="monto">S/ {{ "%.2f"|format(producto.precio_unitario) }}</span></td>
                 <td>{{ producto.unidad.abreviatura }}</td>
                 <td class="{% if producto.stock_total == 0 %}stock-critico{% endif %}">
                     {{ producto.stock_total }}
@@ -53,15 +53,17 @@
                     {% if producto.estado %}
                     <form method="POST"
                           action="{{ url_for('productos.desactivar', id_producto=producto.id_producto) }}"
-                          onsubmit="return confirm('¿Desactivar {{ producto.nombre_producto }}?');"
+                          data-confirmar="¿Desactivar {{ producto.nombre_producto }}?"
                           style="display:inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="icono-accion" title="Desactivar">🗑️</button>
                     </form>
                     {% else %}
                     <form method="POST"
                           action="{{ url_for('productos.reactivar', id_producto=producto.id_producto) }}"
-                          onsubmit="return confirm('¿Reactivar {{ producto.nombre_producto }}?');"
+                          data-confirmar="¿Reactivar {{ producto.nombre_producto }}?"
                           style="display:inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="icono-accion" title="Reactivar">♻️</button>
                     </form>
                     {% endif %}

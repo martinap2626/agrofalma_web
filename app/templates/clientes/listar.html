@@ -44,12 +44,14 @@
                        class="icono-accion" title="Editar">✏️</a>
                     {% if cliente.estado %}
                     <form method="POST" action="{{ url_for('ventas.desactivar_cliente', id_cliente=cliente.id_cliente) }}"
-                          onsubmit="return confirm('¿Desactivar {{ cliente.nombre_cliente }}?');" style="display:inline">
+                          data-confirmar="¿Desactivar {{ cliente.nombre_cliente }}?" style="display:inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="icono-accion" title="Desactivar">🗑️</button>
                     </form>
                     {% else %}
                     <form method="POST" action="{{ url_for('ventas.reactivar_cliente', id_cliente=cliente.id_cliente) }}"
-                          onsubmit="return confirm('¿Reactivar {{ cliente.nombre_cliente }}?');" style="display:inline">
+                          data-confirmar="¿Reactivar {{ cliente.nombre_cliente }}?" style="display:inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="icono-accion" title="Reactivar">♻️</button>
                     </form>
                     {% endif %}

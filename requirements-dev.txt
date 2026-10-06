@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# pruebas automatizadas:  python -m pytest tests -v
+pytest==9.1.1

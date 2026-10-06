@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ocurrió un problema — Agrofalma y Consultores EIRL</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="pagina-login">
+    <div class="tarjeta tarjeta-error tarjeta-servicio-caido">
+        <div class="icono-servicio-caido">🌱</div>
+        <h1>Ocurrió un problema inesperado</h1>
+        <p>
+            No pudimos completar tu solicitud. Tus datos anteriores no se perdieron.
+            El equipo técnico ya quedó con el detalle del error registrado.
+        </p>
+        <p class="login-subtitulo">
+            Inténtalo de nuevo en unos minutos. Si el problema continúa, comunícate con soporte técnico.
+        </p>
+        <a href="{{ url_for('index') }}" class="boton-primario">Volver al inicio</a>
+    </div>
+</body>
+</html>

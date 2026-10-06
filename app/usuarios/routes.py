@@ -16,6 +16,7 @@ from app.extensions import db
 from app.decorators import rol_requerido
 from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
 from app.models import Usuario, Rol, Sede
+from app.seguridad import registrar_accion, validar_contrasena, validar_largo
 
 bp = Blueprint("usuarios", __name__, url_prefix="/usuarios")
 
@@ -28,7 +29,7 @@ def listar():
     busqueda = request.args.get("q", "").strip()
 
     try:
-        consulta = Usuario.query
+        consulta = Usuario.query.options(db.joinedload(Usuario.rol), db.joinedload(Usuario.sede))
         if busqueda:
             patron = f"%{busqueda}%"
             consulta = consulta.filter(
@@ -76,6 +77,10 @@ def nuevo():
             db.session.add(usuario)
             try:
                 db.session.commit()
+                registrar_accion(
+                    "usuario_creado", "usuario", usuario.id_usuario,
+                    f"{usuario.usuario_login} (rol {usuario.rol.nombre_rol})",
+                )
                 flash(f'Usuario "{usuario.usuario_login}" creado correctamente.', "success")
                 return redirect(url_for("usuarios.listar"))
             except IntegrityError:
@@ -123,6 +128,11 @@ def editar(id_usuario):
 
             try:
                 db.session.commit()
+                registrar_accion(
+                    "usuario_editado", "usuario", usuario.id_usuario,
+                    f"{usuario.usuario_login} (rol {usuario.rol.nombre_rol})"
+                    + ("; contraseña cambiada" if datos["contrasena"] else ""),
+                )
                 flash(f'Usuario "{usuario.usuario_login}" actualizado correctamente.', "success")
                 return redirect(url_for("usuarios.listar"))
             except IntegrityError:
@@ -160,6 +170,7 @@ def desactivar(id_usuario):
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return redirect(url_for("usuarios.listar"))
 
+    registrar_accion("usuario_desactivado", "usuario", usuario.id_usuario, usuario.usuario_login)
     flash(f'Usuario "{usuario.usuario_login}" desactivado.', "success")
     return redirect(url_for("usuarios.listar"))
 
@@ -178,6 +189,7 @@ def reactivar(id_usuario):
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return redirect(url_for("usuarios.listar"))
 
+    registrar_accion("usuario_reactivado", "usuario", usuario.id_usuario, usuario.usuario_login)
     flash(f'Usuario "{usuario.usuario_login}" reactivado.', "success")
     return redirect(url_for("usuarios.listar"))
 
@@ -198,6 +210,10 @@ def _validar_formulario(form, es_nuevo, id_usuario_actual=None):
     contrasena = form.get("contrasena", "")
     confirmar_contrasena = form.get("confirmar_contrasena", "")
 
+    validar_largo(errores, nombre, 50, "El nombre")
+    validar_largo(errores, apellido, 50, "El apellido")
+    validar_largo(errores, usuario_login, 30, "El usuario de acceso")
+    validar_largo(errores, correo, 100, "El correo")
     if not nombre:
         errores.append("El nombre es obligatorio.")
     if not apellido:
@@ -216,8 +232,8 @@ def _validar_formulario(form, es_nuevo, id_usuario_actual=None):
 
     if es_nuevo and not contrasena:
         errores.append("La contraseña es obligatoria.")
-    if contrasena and len(contrasena) < 6:
-        errores.append("La contraseña debe tener al menos 6 caracteres.")
+    if contrasena:
+        errores.extend(validar_contrasena(contrasena, usuario_login))
     if contrasena and contrasena != confirmar_contrasena:
         errores.append("Las contraseñas no coinciden.")
 

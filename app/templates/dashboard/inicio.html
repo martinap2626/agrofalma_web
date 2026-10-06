@@ -32,25 +32,73 @@
 <div class="grid-kpis">
     <div class="tarjeta tarjeta-kpi">
         <div class="etiqueta-kpi">Ventas del mes <small>(total vendido)</small></div>
-        <div class="valor-kpi">S/ {{ "%.2f"|format(total_mes) }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "%.2f"|format(total_mes) }}</span></div>
     </div>
     <div class="tarjeta tarjeta-kpi">
         <div class="etiqueta-kpi">Ventas al contado</div>
-        <div class="valor-kpi">S/ {{ "%.2f"|format(ventas_contado) }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "%.2f"|format(ventas_contado) }}</span></div>
     </div>
     <div class="tarjeta tarjeta-kpi">
         <div class="etiqueta-kpi">Ventas a crédito</div>
-        <div class="valor-kpi">S/ {{ "%.2f"|format(ventas_credito) }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "%.2f"|format(ventas_credito) }}</span></div>
     </div>
     <div class="tarjeta tarjeta-kpi">
         <div class="etiqueta-kpi">Recuperaciones del mes <small>(cobros de cualquier periodo)</small></div>
-        <div class="valor-kpi">S/ {{ "%.2f"|format(recuperaciones_mes) }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "%.2f"|format(recuperaciones_mes) }}</span></div>
     </div>
     <div class="tarjeta tarjeta-kpi">
         <div class="etiqueta-kpi">Ingreso de caja del mes <small>(contado + recuperaciones)</small></div>
-        <div class="valor-kpi">S/ {{ "%.2f"|format(ingreso_caja_mes) }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "%.2f"|format(ingreso_caja_mes) }}</span></div>
     </div>
 </div>
+
+{% if panorama %}
+<div class="tarjeta" style="margin-bottom:18px">
+    <h2 style="font-size:16px;margin-top:0">
+        Panorama de la analítica
+        <a href="{{ url_for('analitica.recomendaciones') }}" class="boton-secundario" style="float:right">Ver analítica comercial</a>
+    </h2>
+    <div class="grid-kpis">
+        <div class="tarjeta tarjeta-kpi">
+            <div class="etiqueta-kpi">Unidades que se esperan vender{% if panorama.periodo %} en {{ panorama.periodo.strftime('%m/%Y') }}{% endif %}</div>
+            <div class="valor-kpi">{{ "{:,.0f}".format(panorama.pronostico_total).replace(",", " ") }}</div>
+        </div>
+        <div class="tarjeta tarjeta-kpi">
+            <div class="etiqueta-kpi">Productos clase A / B / C</div>
+            <div class="valor-kpi">{{ panorama.clases.get('A', 0) }} / {{ panorama.clases.get('B', 0) }} / {{ panorama.clases.get('C', 0) }}</div>
+        </div>
+        <div class="tarjeta tarjeta-kpi">
+            <div class="etiqueta-kpi">Reposición urgente / media</div>
+            <div class="valor-kpi">{{ panorama.urgentes }} / {{ panorama.medias }}</div>
+        </div>
+    </div>
+    <div class="fila-formulario" style="align-items:flex-start;margin-top:12px">
+        <div>
+            <strong>Los 5 productos con más demanda prevista</strong>
+            <table class="tabla">
+                <thead><tr><th>Producto</th><th>Clase</th><th>Unidades</th></tr></thead>
+                <tbody>
+                    {% for nombre, unidades, clase in panorama.top %}
+                    <tr><td>{{ nombre }}</td><td>{{ clase or '—' }}</td><td>{{ unidades|round(0, 'ceil')|int }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <strong>Últimos eventos del negocio</strong>
+            {% if panorama.eventos %}
+            <ul>
+                {% for fecha, producto, descripcion in panorama.eventos %}
+                <li>{{ fecha.strftime('%d/%m/%Y') }} · {{ producto }}: {{ descripcion }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="texto-ayuda" style="margin-top:12px">Todavía no hay eventos registrados. <a href="{{ url_for('eventos.nuevo') }}">Registrar uno</a>.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <div class="tarjeta" style="margin-bottom:18px">
     <h2 style="font-size:16px;margin-top:0">
@@ -148,7 +196,7 @@
                 <tr>
                     <td>{{ loop.index }}</td>
                     <td>{{ fila.producto }}</td>
-                    <td>S/ {{ "%.2f"|format(fila.total) }}</td>
+                    <td><span class="monto">S/ {{ "%.2f"|format(fila.total) }}</span></td>
                 </tr>
                 {% endfor %}
             </tbody>

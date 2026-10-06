@@ -24,6 +24,7 @@ from app.extensions import db
 from app.decorators import rol_requerido
 from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion as _registrar_error_conexion
 from app.models import Producto, Categoria, UnidadMedida
+from app.seguridad import leer_decimal, registrar_accion, validar_largo
 
 bp = Blueprint("productos", __name__, url_prefix="/productos")
 
@@ -38,7 +39,13 @@ def listar():
     busqueda = request.args.get("q", "").strip()
 
     try:
-        consulta = Producto.query
+        # categoría, unidad y stock por sede se traen junto con los productos
+        # (3 consultas en total) en vez de 3 consultas POR CADA producto
+        consulta = Producto.query.options(
+            db.joinedload(Producto.categoria),
+            db.joinedload(Producto.unidad),
+            db.selectinload(Producto.stock_por_sede),
+        )
         if busqueda:
             consulta = consulta.filter(Producto.nombre_producto.ilike(f"%{busqueda}%"))
         productos = consulta.order_by(Producto.nombre_producto).all()
@@ -85,6 +92,7 @@ def nuevo():
             db.session.add(producto)
             try:
                 db.session.commit()
+                registrar_accion("producto_creado", "producto", producto.id_producto, producto.nombre_producto)
                 flash(f'Producto "{producto.nombre_producto}" registrado correctamente.', "success")
                 return redirect(url_for("productos.listar"))
             except IntegrityError:
@@ -153,6 +161,7 @@ def editar(id_producto):
                 setattr(producto, campo, valor)
             try:
                 db.session.commit()
+                registrar_accion("producto_editado", "producto", producto.id_producto, producto.nombre_producto)
                 flash(f'Producto "{producto.nombre_producto}" actualizado correctamente.', "success")
                 return redirect(url_for("productos.listar"))
             except IntegrityError:
@@ -202,6 +211,7 @@ def desactivar(id_producto):
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return redirect(url_for("productos.listar"))
 
+    registrar_accion("producto_desactivado", "producto", producto.id_producto, producto.nombre_producto)
     flash(f'Producto "{producto.nombre_producto}" desactivado.', "success")
     return redirect(url_for("productos.listar"))
 
@@ -223,6 +233,7 @@ def reactivar(id_producto):
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return redirect(url_for("productos.listar"))
 
+    registrar_accion("producto_reactivado", "producto", producto.id_producto, producto.nombre_producto)
     flash(f'Producto "{producto.nombre_producto}" reactivado.', "success")
     return redirect(url_for("productos.listar"))
 
@@ -252,19 +263,24 @@ def _validar_formulario(form, id_producto_actual=None):
 
     if not nombre:
         errores.append("El nombre del producto es obligatorio.")
+    validar_largo(errores, codigo, 20, "El código")
+    validar_largo(errores, nombre, 80, "El nombre del producto")
+    validar_largo(errores, descripcion, 200, "La descripción")
 
     try:
-        precio = Decimal(precio_raw)
-        if precio < 0:
+        if Decimal(precio_raw) < 0:
             errores.append("El precio no puede ser negativo.")
+            precio = Decimal("0")
+        else:
+            precio = leer_decimal(precio_raw)
     except (InvalidOperation, ValueError):
         errores.append("El precio ingresado no es válido.")
         precio = Decimal("0")
 
     try:
         stock_minimo = int(stock_min_raw or 0)
-        if stock_minimo < 0:
-            errores.append("El stock mínimo no puede ser negativo.")
+        if stock_minimo < 0 or stock_minimo > 1_000_000:
+            errores.append("El stock mínimo debe estar entre 0 y 1 000 000.")
     except ValueError:
         errores.append("El stock mínimo ingresado no es válido.")
         stock_minimo = 0

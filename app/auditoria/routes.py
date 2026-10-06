@@ -1,0 +1,109 @@
+"""
+Consulta de la bitácora de auditoría — exclusivo del Administrador (RNF-03).
+
+Es de solo lectura: ninguna pantalla permite editar ni borrar registros de
+la bitácora, de modo que sirva como evidencia confiable de quién hizo qué.
+"""
+
+from datetime import date, datetime, timedelta
+
+from flask import Blueprint, flash, render_template, request
+from flask_login import login_required
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.decorators import rol_requerido
+from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
+from app.models import Bitacora
+
+POR_PAGINA = 10
+
+# nombres legibles de cada acción, para que el Administrador no lea códigos internos
+ETIQUETAS_ACCION = {
+    "login_exitoso": "Inicio de sesión",
+    "login_fallido": "Intento de acceso fallido",
+    "login_bloqueado": "Acceso bloqueado por intentos fallidos",
+    "login_cuenta_inactiva": "Intento de acceso con cuenta desactivada",
+    "logout": "Cierre de sesión",
+    "venta_registrada": "Venta registrada",
+    "pago_registrado": "Pago de crédito registrado",
+    "cliente_creado": "Cliente creado",
+    "cliente_editado": "Cliente editado",
+    "cliente_desactivado": "Cliente desactivado",
+    "cliente_reactivado": "Cliente reactivado",
+    "producto_creado": "Producto creado",
+    "producto_editado": "Producto editado",
+    "producto_desactivado": "Producto desactivado",
+    "producto_reactivado": "Producto reactivado",
+    "usuario_creado": "Usuario creado",
+    "usuario_editado": "Usuario editado",
+    "usuario_desactivado": "Usuario desactivado",
+    "usuario_reactivado": "Usuario reactivado",
+    "evento_creado": "Evento del negocio registrado",
+    "evento_editado": "Evento del negocio editado",
+    "evento_eliminado": "Evento del negocio eliminado",
+    "reporte_exportado": "Reporte exportado a CSV",
+    "acceso_denegado": "Acceso denegado (sin permiso)",
+    "csrf_rechazado": "Formulario rechazado (token inválido)",
+}
+
+bp = Blueprint("auditoria", __name__, url_prefix="/auditoria")
+
+
+# convierte "YYYY-MM-DD" en fecha, o None si viene vacío o mal escrito
+def _fecha(texto):
+    try:
+        return date.fromisoformat(texto)
+    except (TypeError, ValueError):
+        return None
+
+
+# lista la bitácora con filtros por fecha, usuario, acción y resultado, paginada de a 50
+@bp.route("")
+@login_required
+@rol_requerido("Administrador")
+def listar():
+    desde = _fecha(request.args.get("desde"))
+    hasta = _fecha(request.args.get("hasta"))
+    usuario = request.args.get("usuario", "").strip()
+    accion = request.args.get("accion", "").strip()
+    resultado = request.args.get("resultado", "").strip()
+    try:
+        pagina = max(int(request.args.get("pagina", "1")), 1)
+    except ValueError:
+        pagina = 1
+
+    contexto = {
+        "desde": desde, "hasta": hasta, "usuario": usuario, "accion": accion,
+        "resultado": resultado, "etiquetas": ETIQUETAS_ACCION, "pagina": pagina,
+        "registros": [], "total": 0, "total_paginas": 1,
+    }
+
+    try:
+        consulta = Bitacora.query
+        if desde:
+            consulta = consulta.filter(Bitacora.fecha_hora >= datetime.combine(desde, datetime.min.time()))
+        if hasta:
+            consulta = consulta.filter(
+                Bitacora.fecha_hora < datetime.combine(hasta + timedelta(days=1), datetime.min.time())
+            )
+        if usuario:
+            consulta = consulta.filter(Bitacora.usuario_login.ilike(f"%{usuario}%"))
+        if accion in ETIQUETAS_ACCION:
+            consulta = consulta.filter(Bitacora.accion == accion)
+        if resultado in ("exito", "fallo", "denegado"):
+            consulta = consulta.filter(Bitacora.resultado == resultado)
+
+        total = consulta.count()
+        total_paginas = max((total + POR_PAGINA - 1) // POR_PAGINA, 1)
+        pagina = min(pagina, total_paginas)
+        registros = (
+            consulta.order_by(Bitacora.fecha_hora.desc(), Bitacora.id_bitacora.desc())
+            .offset((pagina - 1) * POR_PAGINA).limit(POR_PAGINA).all()
+        )
+    except SQLAlchemyError as error:
+        registrar_error_conexion("consultar bitácora", error)
+        flash(MENSAJE_ERROR_CONEXION, "danger")
+        return render_template("auditoria/listar.html", **contexto), 503
+
+    contexto.update(registros=registros, total=total, total_paginas=total_paginas, pagina=pagina)
+    return render_template("auditoria/listar.html", **contexto)

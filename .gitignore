@@ -10,3 +10,14 @@ instance/
 # datos de negocio derivados (ventas reales) -- no se versionan en git
 analitica_job/datos_procesados/
 analitica_job/modelos/
+
+# ventas reales de Pimentel (ventas_largas.csv) y resultados derivados de la experimentacion -- no se versionan
+analitica_job/pimentel/datos/
+# resultados de ejecuciones puntuales de la prueba de carga
+pruebas_carga/resultados/
+
+# respaldos de la base de datos (RNF-06) -- contienen datos reales, no se versionan
+respaldos/
+# registros de la aplicacion y cache de pruebas
+logs/
+.pytest_cache/
