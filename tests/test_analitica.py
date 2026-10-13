@@ -615,3 +615,55 @@ def test_con_inventario_de_solo_algunos_productos_los_demas_quedan_en_plan_sin_e
         assert recs["AGRO DOS"].nivel_urgencia == "plan" and recs["AGRO DOS"].stock_actual is None
         db.session.query(StockPorSede).delete()
         db.session.commit()
+
+
+def test_la_plantilla_de_inventario_se_explica_sola_y_solo_deja_escribir_enteros(app_a, tmp_path):
+    from openpyxl import load_workbook
+
+    ruta = tmp_path / "plantilla.xlsx"
+    hojas = _hojas_catalogo()
+    hojas["presentaciones"]["presentacion"] = ["250 ML", "1 L", "KG granel"]
+    hojas["presentaciones"]["unidades_ult_12m"] = [70.0, 50.0, 24.0]
+    with app_a.app_context():
+        srv.generar_plantilla_inventario(hojas, ruta)
+    libro = load_workbook(ruta)
+    assert libro.sheetnames == ["Instrucciones", "Datos del conteo", "Inventario"]
+    texto = " ".join(str(c.value) for fila in libro["Instrucciones"].iter_rows() for c in fila if c.value)
+    assert "CÓMO LLENARLO" in texto and "EJEMPLO" in texto and "sin letras" in texto
+    inv = libro["Inventario"]
+    cabecera = [c.value for c in inv[1]]
+    assert cabecera == ["producto_base", "presentacion", "categoria", "unidad_de_conteo", "vendido_en_12_meses (referencia)",
+                        "stock_actual", "observaciones"]
+    assert inv["D4"].value.startswith("KG") and inv["D2"].value.startswith("unidades")
+    validacion = inv.data_validations.dataValidation[0]
+    assert validacion.type == "whole" and "F2:F4" in str(validacion.sqref) and validacion.showErrorMessage
+    assert inv["F2"].fill.fgColor.rgb.endswith("FFF2B3")
+    datos = {f[0].value: f[1].value for f in libro["Datos del conteo"].iter_rows(min_row=2)}
+    assert {"dias_reposicion", "descuento_maximo_vendedor_pct", "responsable_del_conteo"} <= set(datos)
+    assert "COUNT(Inventario!F2:F4)" in datos["avance_filas_llenadas"]
+
+
+def test_la_carga_de_inventario_real_queda_en_el_kardex_y_devuelve_las_respuestas_del_gerente(app_a, tmp_path):
+    from app.models import MovimientoInventario
+
+    ruta = tmp_path / "inv.xlsx"
+    with app_a.app_context():
+        srv.cargar_catalogo(_hojas_catalogo(), aplicar=True, reemplazar_prueba=True)
+        srv.generar_plantilla_inventario(_hojas_catalogo(), ruta)
+        libro = pd.ExcelFile(ruta)
+        inv = libro.parse("Inventario")
+        inv["stock_actual"] = [10, 5, 8]
+        datos = libro.parse("Datos del conteo")
+        datos.loc[datos["campo"] == "dias_reposicion", "valor"] = "20"
+        datos.loc[datos["campo"] == "fecha_del_conteo", "valor"] = "2026-10-20"
+        with pd.ExcelWriter(ruta) as w:
+            datos.to_excel(w, sheet_name="Datos del conteo", index=False)
+            inv.to_excel(w, sheet_name="Inventario", index=False)
+        simulacion = srv.cargar_inventario(ruta, aplicar=False)
+        propios = MovimientoInventario.motivo.like("%conteo del 2026-10-20%")
+        assert simulacion["respuestas"] == {"dias_reposicion": "20"} and MovimientoInventario.query.filter(propios).count() == 0
+        srv.cargar_inventario(ruta, aplicar=True)
+        movimientos = MovimientoInventario.query.filter(propios).all()
+        assert len(movimientos) == 2 and all(m.tipo == "ajuste" for m in movimientos)
+        assert {m.stock_resultante for m in movimientos} == {15, 8}
+        assert StockPorSede.query.filter_by(origen="real").count() >= 2

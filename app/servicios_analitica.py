@@ -21,7 +21,7 @@ from sqlalchemy import inspect, text
 from app.extensions import db
 from app.models import (
     Categoria, Cliente, Credito, DetalleVenta, EjecucionAnalitica, EventoNegocio, PlanCampana, PrediccionDemanda, Producto,
-    Recuperacion, RecomendacionAbastecimiento, Sede, SegmentacionProducto, StockPorSede, UnidadMedida, Venta,
+    Recuperacion, RecomendacionAbastecimiento, Rol, Sede, SegmentacionProducto, StockPorSede, UnidadMedida, Usuario, Venta,
 )
 
 HORIZONTE_SEMANAS = 4  # el pronóstico es del mes siguiente (≈ 4 semanas)
@@ -219,38 +219,116 @@ def cargar_catalogo(hojas: dict[str, pd.DataFrame], aplicar: bool = False, reemp
 # Inventario (stock actual) desde Excel
 # ---------------------------------------------------------------------------
 def generar_plantilla_inventario(hojas: dict[str, pd.DataFrame], ruta: Path) -> Path:
-    """Excel para que el gerente anote el stock actual por producto y presentación."""
-    from openpyxl.styles import Alignment, Font, PatternFill
+    """
+    Excel para que el gerente anote el stock real por producto y presentación. Pensado para que se entienda solo: una hoja de
+    instrucciones con un ejemplo, una hoja de datos del conteo (con preguntas del negocio que sirven para ajustar el sistema) y la
+    hoja de inventario con las celdas a llenar pintadas, validación de números enteros y un contador de avance.
+    """
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.datavalidation import DataValidation
 
-    pres = hojas["presentaciones"][["producto_base", "presentacion"]].copy()
-    prod = hojas["productos"][["producto_base", "categoria_sistema", "unidades_ult_12m"]]
-    plantilla = pres.merge(prod, on="producto_base", how="left")
+    columnas_pres = ["producto_base", "presentacion"] + (["unidades_ult_12m"] if "unidades_ult_12m" in hojas["presentaciones"] else [])
+    pres = hojas["presentaciones"][columnas_pres].copy()
+    prod = hojas["productos"][["producto_base", "categoria_sistema"]]
+    plantilla = pres.merge(prod, on="producto_base", how="left").rename(
+        columns={"categoria_sistema": "categoria", "unidades_ult_12m": "vendido_en_12_meses (referencia)"})
+    plantilla["presentacion"] = plantilla["presentacion"].replace("sin presentación indicada", "(única o sin indicar)")
+    plantilla["unidad_de_conteo"] = plantilla["presentacion"].map(
+        lambda p: "KG (se vende a granel)" if "granel" in str(p).lower() else "unidades (frascos, sacos, cajas...)")
     plantilla["stock_actual"] = None
     plantilla["observaciones"] = None
-    plantilla = plantilla.rename(columns={"categoria_sistema": "categoria", "unidades_ult_12m": "ventas_ult_12_meses (referencia)"})
-    instrucciones = pd.DataFrame({"Cómo llenar": [
-        "1. Anote en 'stock_actual' cuántas unidades hay HOY en la sede, por cada presentación (frascos, sacos, cajas: lo que se cuente al vender).",
-        "2. Si un producto no se tiene, ponga 0. No deje en blanco los que sí maneje.",
-        "3. No cambie los nombres de producto ni de presentación (el sistema los usa para reconocerlos).",
-        "4. Indique la fecha del conteo en la hoja 'Datos del conteo'.",
-        "5. Si hay más de una sede con inventario, copie este archivo y llénelo por separado indicando la sede.",
-    ]})
-    datos = pd.DataFrame({"campo": ["sede", "fecha_del_conteo"], "valor": [SEDE_PRINCIPAL, date.today().isoformat()]})
+    orden = ["producto_base", "presentacion", "categoria", "unidad_de_conteo"]
+    orden += [c for c in plantilla.columns if c.startswith("vendido_en")] + ["stock_actual", "observaciones"]
+    plantilla = plantilla[orden]
+    col_stock = orden.index("stock_actual") + 1
+    letra_stock = get_column_letter(col_stock)
+    filas = len(plantilla) + 1
+
+    instrucciones = [
+        ("QUÉ SE NECESITA DE USTED", True),
+        ("Un conteo real de lo que hay HOY en el almacén. Con eso el sistema deja de usar un stock estimado y las recomendaciones de compra, "
+         "las alertas de «se acaba antes de la reposición» y la ficha de cada producto pasan a trabajar con datos reales.", False),
+        ("", False),
+        ("CÓMO LLENARLO (unos 30 a 60 minutos)", True),
+        ("1. Vaya a la hoja «Inventario». Cada fila es un producto con su presentación (por ejemplo, un abono de 1 L).", False),
+        ("2. En la columna AMARILLA «stock_actual» escriba cuántas unidades hay: cuente frascos, sacos o cajas tal como los vende. "
+         "Si se vende a granel, escriba los kilos.", False),
+        ("3. Si no tiene ese producto, escriba 0. Si ya no lo maneja, escriba 0 y anótelo en «observaciones».", False),
+        ("4. Escriba solo números enteros, sin letras ni unidades (escriba 12, no «12 frascos»). El Excel no le dejará escribir otra cosa.", False),
+        ("5. No cambie los nombres de producto ni de presentación, ni borre filas: el sistema los usa para reconocerlos.", False),
+        ("6. En la hoja «Datos del conteo» anote la fecha del conteo, quién contó y responda las preguntas del negocio.", False),
+        ("7. Guarde el archivo y devuélvalo. No hace falta llenar la columna «vendido_en_12_meses»: solo es una referencia para que "
+         "note si algún número le parece raro (por ejemplo, 500 unidades de un producto que se vende poco).", False),
+        ("", False),
+        ("EJEMPLO", True),
+        ("Fila: AGRO ARROZ MACOLLO · 1 L · Foliares · unidades  ->  stock_actual: 18  (hay 18 frascos de 1 litro).", False),
+        ("", False),
+        ("QUÉ PASA CON ESTOS DATOS", True),
+        ("Se cargan como conteo físico: queda registrado quién y cuándo los cargó, y cada producto pasa de «estimado» a «real». "
+         "Su información no se publica ni se comparte.", False),
+    ]
+    avance = f'=COUNT(Inventario!{letra_stock}2:{letra_stock}{filas})&" de {len(plantilla)}"'
+    datos = [
+        ("sede", SEDE_PRINCIPAL, "Sede donde se hizo el conteo."),
+        ("fecha_del_conteo", date.today().isoformat(), "Cambie la fecha por la del día en que contó (año-mes-día)."),
+        ("responsable_del_conteo", "", "Nombre de quien contó."),
+        ("dias_reposicion", "", "PREGUNTA: ¿cuántos días pasan, normalmente, desde que pide mercadería hasta que llega al almacén? (el sistema usa hoy 15)."),
+        ("descuento_maximo_vendedor_pct", "", "PREGUNTA: ¿qué descuento máximo (en %) puede dar un vendedor sin consultarle? (el sistema usa hoy 10)."),
+        ("productos_que_ya_no_vende", "", "PREGUNTA: escriba los productos que ya no vende, separados por comas (o déjelo en blanco)."),
+        ("productos_nuevos_sin_historial", "", "PREGUNTA: escriba los productos nuevos que no aparecen en la lista (o déjelo en blanco)."),
+        ("avance_filas_llenadas", avance, "Se calcula solo: cuántas filas lleva llenadas."),
+    ]
     ruta.parent.mkdir(parents=True, exist_ok=True)
+    verde, amarillo = PatternFill("solid", fgColor="1F5C3B"), PatternFill("solid", fgColor="FFF2B3")
+    borde = Border(left=Side(style="thin", color="BFBFBF"), right=Side(style="thin", color="BFBFBF"),
+                   top=Side(style="thin", color="BFBFBF"), bottom=Side(style="thin", color="BFBFBF"))
     with pd.ExcelWriter(ruta, engine="openpyxl") as w:
-        instrucciones.to_excel(w, sheet_name="Instrucciones", index=False)
-        datos.to_excel(w, sheet_name="Datos del conteo", index=False)
+        pd.DataFrame({"Instrucciones": [x for x, _ in instrucciones]}).to_excel(w, sheet_name="Instrucciones", index=False)
+        pd.DataFrame(datos, columns=["campo", "valor", "qué se pide"]).to_excel(w, sheet_name="Datos del conteo", index=False)
         plantilla.to_excel(w, sheet_name="Inventario", index=False)
-        for nombre, df in (("Instrucciones", instrucciones), ("Datos del conteo", datos), ("Inventario", plantilla)):
-            ws = w.sheets[nombre]
-            for celda in ws[1]:
+
+        ws = w.sheets["Instrucciones"]
+        ws.column_dimensions["A"].width = 120
+        for fila, (_, titulo) in enumerate(instrucciones, start=2):
+            celda = ws.cell(row=fila, column=1)
+            celda.alignment = Alignment(wrap_text=True, vertical="top")
+            if titulo:
+                celda.font = Font(bold=True, color="1F5C3B", size=12)
+
+        ws = w.sheets["Datos del conteo"]
+        for letra, ancho in (("A", 34), ("B", 30), ("C", 100)):
+            ws.column_dimensions[letra].width = ancho
+        for fila in range(2, len(datos) + 2):
+            if fila < len(datos) + 1:
+                ws.cell(row=fila, column=2).fill = amarillo
+            ws.cell(row=fila, column=2).border = borde
+            ws.cell(row=fila, column=3).alignment = Alignment(wrap_text=True, vertical="top")
+
+        ws = w.sheets["Inventario"]
+        anchos = {"producto_base": 38, "presentacion": 26, "categoria": 16, "unidad_de_conteo": 34, "stock_actual": 16, "observaciones": 40}
+        for i, col in enumerate(plantilla.columns, start=1):
+            ws.column_dimensions[get_column_letter(i)].width = anchos.get(col, 22)
+        for i in range(2, filas + 1):
+            for c in (col_stock, col_stock + 1):
+                ws.cell(row=i, column=c).fill = amarillo
+                ws.cell(row=i, column=c).border = borde
+        validacion = DataValidation(type="whole", operator="between", formula1="0", formula2="1000000", allow_blank=True,
+                                    showErrorMessage=True, errorTitle="Solo números enteros",
+                                    error="Escriba un número entero entre 0 y 1 000 000 (sin letras ni unidades).",
+                                    showInputMessage=True, promptTitle="Stock actual",
+                                    prompt="Cuántas unidades hay hoy. Si no tiene este producto, escriba 0.")
+        ws.add_data_validation(validacion)
+        validacion.add(f"{letra_stock}2:{letra_stock}{filas}")
+
+        for nombre in ("Instrucciones", "Datos del conteo", "Inventario"):
+            hoja = w.sheets[nombre]
+            for celda in hoja[1]:
                 celda.font = Font(bold=True, color="FFFFFF")
-                celda.fill = PatternFill("solid", fgColor="1F5C3B")
-                celda.alignment = Alignment(wrap_text=True)
-            for i, col in enumerate(df.columns, start=1):
-                ws.column_dimensions[get_column_letter(i)].width = 100 if nombre == "Instrucciones" else min(max(len(str(col)) + 2, 14), 45)
-            ws.freeze_panes = "A2"
+                celda.fill = verde
+                celda.alignment = Alignment(wrap_text=True, vertical="center")
+            hoja.freeze_panes = "A2"
+        ws.auto_filter.ref = f"A1:{get_column_letter(len(plantilla.columns))}{filas}"
     return ruta
 
 
@@ -272,13 +350,25 @@ def cargar_inventario(ruta: Path, aplicar: bool = False) -> dict:
 
     productos = {p.nombre_producto: p for p in Producto.query.all()}
     desconocidos = sorted(set(por_base.index) - set(productos))
-    resumen = {"sede": sede.nombre_sede, "productos_con_stock": int(len(por_base)), "desconocidos": desconocidos, "aplicado": False}
+    claves = ("dias_reposicion", "descuento_maximo_vendedor_pct", "productos_que_ya_no_vende", "productos_nuevos_sin_historial")
+    resumen = {"sede": sede.nombre_sede, "productos_con_stock": int(len(por_base)), "desconocidos": desconocidos, "aplicado": False,
+               "respuestas": {k: str(datos[k]) for k in claves if str(datos.get(k, "nan")) not in ("nan", "")}}
     if not aplicar:
         return resumen
 
+    # con un Administrador en el sistema, cada producto se carga como conteo físico (queda en el kárdex con quién y cuándo);
+    # sin ninguno (por ejemplo, una base de pruebas vacía) se fija el stock directamente
+    admin = (Usuario.query.join(Rol).filter(Rol.nombre_rol == "Administrador", Usuario.estado.is_(True))
+             .order_by(Usuario.id_usuario).first())
+    motivo = f"Carga de inventario real desde Excel del gerente (conteo del {datos.get('fecha_del_conteo', 'sin fecha')})"
     for nombre, cantidad in por_base.items():
         producto = productos.get(nombre)
         if producto is None:
+            continue
+        if admin is not None:
+            from app.servicios_inventario import ajustar_a_conteo
+
+            ajustar_a_conteo(producto.id_producto, sede.id_sede, int(round(cantidad)), admin.id_usuario, motivo)
             continue
         fila = StockPorSede.query.filter_by(id_producto=producto.id_producto, id_sede=sede.id_sede).first()
         if fila is None:
