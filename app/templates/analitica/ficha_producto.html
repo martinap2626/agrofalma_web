@@ -18,6 +18,7 @@
     {% if rec and rec.clase_abc %} · Clase {{ rec.clase_abc }} {{ info('A: los productos que más pesan en las ventas. B: venta intermedia. C: poca venta.') }}{% endif %}
     {% if confiabilidad %} · Confiabilidad del pronóstico: <strong>{{ confiabilidad }}</strong>{% endif %}
 </p>
+<p class="login-subtitulo">Cómo se vende: <strong>{{ patron.tipo }}</strong> {{ info('Se deduce de las ventas de los últimos 12 meses: regular (casi todos los meses y sin grandes saltos), de temporada (casi todo en pocos meses), esporádica (3 meses o menos) o variable.') }}. {{ patron.texto }}</p>
 
 {% if demanda is none %}
 <div class="tarjeta"><p>Todavía no hay una predicción para este producto. Aparecerá cuando se actualice la analítica y el producto tenga ventas suficientes.</p></div>
@@ -73,7 +74,7 @@
 {% endif %}
 
 <div class="tarjeta">
-    <h3>Ventas de los últimos 12 meses</h3>
+    <h3>Ventas de los últimos 12 meses (hasta {{ meses[-1].etiqueta }})</h3>
     <table class="tabla">
         <caption class="solo-lector">Unidades vendidas por mes de {{ producto.nombre_producto }}</caption>
         <thead><tr><th scope="col">Mes</th><th scope="col">Unidades</th><th scope="col"><span class="solo-lector">Gráfico</span></th></tr></thead>
@@ -87,7 +88,7 @@
             {% endfor %}
         </tbody>
     </table>
-    <p class="texto-ayuda">Solo cuentan las ventas registradas en la plataforma y las importadas del historial; las ventas anuladas no se incluyen. Un mes en cero significa que no hubo ventas registradas.</p>
+    <p class="texto-ayuda">Solo cuentan las ventas registradas en la plataforma y las importadas del historial; las ventas anuladas no se incluyen. Un mes en cero significa que no hubo ventas registradas en ese mes. La tabla termina en el mes de la última venta registrada en el sistema.</p>
 </div>
 
 {% if eventos %}

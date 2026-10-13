@@ -25,6 +25,24 @@
     </div>
 </div>
 
+{% if alertas_ventas %}
+<div class="tarjeta" role="region" aria-label="Ventas inusuales este mes">
+    <h3 style="margin-top:0">Ventas inusuales este mes {{ info('Compara lo vendido en lo que va del mes con la parte de la venta esperada que tocaba a esta altura. Es una alerta para mirar el producto: un pedido grande de un cliente o una campaña pueden explicarla.') }}</h3>
+    <ul>
+        {% for a in alertas_ventas %}
+        <li>
+            <a href="{{ url_for('analitica.ficha_de_producto', id_producto=a.id_producto) }}">{{ a.nombre }}</a>:
+            {% if a.tipo == 'mas' %}<span class="etiqueta etiqueta-alerta">Más de lo normal</span>
+            lleva {{ a.vendido }} unidades y a esta altura tocaban unas {{ a.tocaba }} (se esperan {{ a.esperado_mes }} en el mes). Puede agotarse antes de lo previsto.
+            {% else %}<span class="etiqueta etiqueta-pendiente">Menos de lo normal</span>
+            lleva {{ a.vendido }} unidades y a esta altura tocaban unas {{ a.tocaba }} (se esperan {{ a.esperado_mes }} en el mes). Puede quedar stock sin salir.
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
 {% if resumen and (resumen.urgentes or resumen.medias or resumen.sin_accion or resumen.plan) %}
 <div class="grid-kpis">
     {% if hay_inventario %}

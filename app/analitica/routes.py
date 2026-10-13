@@ -27,6 +27,7 @@ from app.extensions import db
 import json
 
 from app import ficha_producto as ficha
+from app.alertas_ventas import detectar_ventas_inusuales
 from app.parametros import parametros_vigentes
 from app.simulador import ESCENARIOS, LIMITES, calcular, comparar_escenarios, leer_entrada
 from app.servicios_analitica import ultima_ejecucion
@@ -115,6 +116,36 @@ def resumir_recomendaciones(todas):
     }
 
 
+def _alertas_de_ventas(hoy=None):
+    """
+    Productos con ventas inusuales en el mes en curso. Solo compara cuando la predicción es PARA este mes (si la predicción es de otro
+    mes no hay con qué comparar y no se avisa nada). Si algo falla, la pantalla igual se muestra, sin alertas.
+    """
+    import calendar
+
+    hoy = hoy or date.today()
+    inicio = hoy.replace(day=1)
+    try:
+        esperado = {}
+        for p in (PrediccionDemanda.query.filter(PrediccionDemanda.periodo_objetivo == inicio)
+                  .order_by(PrediccionDemanda.fecha_generacion).all()):
+            esperado[p.id_producto] = (p.producto.nombre_producto, float(p.demanda_estimada))  # la última generación pisa a las anteriores
+        if not esperado:
+            return []
+        vendido = dict(
+            db.session.query(DetalleVenta.id_producto, db.func.sum(DetalleVenta.cantidad))
+            .join(Venta, Venta.id_venta == DetalleVenta.id_venta)
+            .filter(Venta.anulada.is_(False), Venta.fecha_hora >= inicio, DetalleVenta.id_producto.in_(list(esperado)))
+            .group_by(DetalleVenta.id_producto).all()
+        )
+    except SQLAlchemyError as error:
+        registrar_error_conexion("buscar ventas inusuales del mes", error)
+        db.session.rollback()
+        return []
+    productos = [{"id_producto": i, "nombre": n, "vendido": vendido.get(i, 0), "esperado": e} for i, (n, e) in esperado.items()]
+    return detectar_ventas_inusuales(productos, hoy.day, calendar.monthrange(hoy.year, hoy.month)[1])
+
+
 # pantalla de recomendaciones de abastecimiento: cruza demanda prevista vs.
 # stock actual y explica en texto plano por que se sugiere cada accion
 @bp.route("")
@@ -151,7 +182,7 @@ def recomendaciones():
     return render_template(
         "analitica/recomendaciones.html", recomendaciones=filas, filtro_urgencia=filtro_urgencia,
         ejecucion=_ejecucion_o_none(), parametros=parametros_vigentes(), hay_plan=hay_plan, hay_inventario=hay_inventario,
-        resumen=resumen,
+        resumen=resumen, alertas_ventas=_alertas_de_ventas(),
     )
 
 
@@ -249,13 +280,16 @@ def ficha_de_producto(id_producto):
                .order_by(RecomendacionAbastecimiento.fecha_generacion.desc()).first())
         pred = (PrediccionDemanda.query.filter_by(id_producto=id_producto)
                 .order_by(PrediccionDemanda.fecha_generacion.desc()).first())
-        hoy = date.today()
-        desde = date(hoy.year - 1, hoy.month, 1)
+        # la ventana de 12 meses termina en el mes de la última venta registrada (no en hoy): si los datos llegan hasta agosto,
+        # septiembre y octubre no se muestran como «cero ventas» cuando en realidad todavía no se cargaron
+        ultima_venta = db.session.query(db.func.max(Venta.fecha_hora)).filter(Venta.anulada.is_(False)).scalar()
+        hoy = ultima_venta.date() if ultima_venta is not None else date.today()
+        desde = ficha.inicio_de_ventana(hoy)
         ventas = (db.session.query(Venta.fecha_hora, DetalleVenta.cantidad)
                   .join(DetalleVenta, DetalleVenta.id_venta == Venta.id_venta)
                   .filter(DetalleVenta.id_producto == id_producto, Venta.anulada.is_(False), Venta.fecha_hora >= desde).all())
         eventos = (EventoNegocio.query.filter(EventoNegocio.id_producto == id_producto,
-                                              EventoNegocio.fecha_inicio >= hoy - timedelta(days=365))
+                                              EventoNegocio.fecha_inicio >= desde)
                    .order_by(EventoNegocio.fecha_inicio.desc()).all())
     except SQLAlchemyError as error:
         registrar_error_conexion("abrir la ficha de un producto", error)
@@ -271,9 +305,10 @@ def ficha_de_producto(id_producto):
         rango = {"error_pct": round(error * 100), "minimo_maximo": ficha.rango_probable(demanda, error)}
         stock = rec.stock_actual if rec is not None and rec.con_inventario else None
         riesgo = ficha.riesgo_de_quiebre(stock, demanda, error, parametros.tiempo_reposicion_dias, parametros.demanda_minima)
+    meses = ficha.ventas_por_mes([(f.date(), c) for f, c in ventas], hoy)
     return render_template(
         "analitica/ficha_producto.html", producto=producto, rec=rec, pred=pred, demanda=demanda, confiabilidad=confiabilidad,
-        rango=rango, riesgo=riesgo, parametros=parametros, meses=ficha.ventas_por_mes([(f.date(), c) for f, c in ventas], hoy),
+        rango=rango, riesgo=riesgo, parametros=parametros, meses=meses, patron=ficha.patron_de_demanda(meses),
         eventos=eventos, ejecucion=_ejecucion_o_none(),
     )
 

@@ -137,3 +137,32 @@ def test_las_ventas_anuladas_no_cuentan_en_la_ficha(app, admin, datos, producto_
 def test_las_tablas_de_analitica_enlazan_a_la_ficha(admin, producto_con_analitica):
     enlace = f"/analitica/producto/{producto_con_analitica}"
     assert enlace in texto(admin.get("/analitica"))
+
+
+def test_la_ventana_de_12_meses_termina_en_el_mes_de_la_ultima_venta():
+    from app.ficha_producto import inicio_de_ventana
+
+    assert inicio_de_ventana(date(2026, 8, 31)) == date(2025, 9, 1)
+    assert inicio_de_ventana(date(2026, 1, 15)) == date(2025, 2, 1)
+    assert inicio_de_ventana(date(2026, 12, 1)) == date(2026, 1, 1)
+
+
+def _serie(unidades):
+    return [{"etiqueta": f"{i + 1:02d}/2026", "unidades": u} for i, u in enumerate(unidades)]
+
+
+def test_el_patron_de_demanda_se_explica_en_palabras():
+    from app.ficha_producto import patron_de_demanda
+
+    assert patron_de_demanda(_serie([0] * 12))["tipo"] == "Sin ventas"
+    esporadica = patron_de_demanda(_serie([0, 5, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0]))
+    assert esporadica["tipo"] == "Esporádica" and "2 de 12" in esporadica["texto"]
+    temporada = patron_de_demanda(_serie([0, 0, 40, 60, 50, 2, 0, 0, 0, 1, 0, 0]))
+    assert temporada["tipo"] == "De temporada" and temporada["meses_fuertes"] == ["04/2026", "05/2026", "03/2026"]
+    assert patron_de_demanda(_serie([20, 22, 18, 25, 21, 19, 23, 20, 24, 22, 21, 20]))["tipo"] == "Regular"
+    variable = patron_de_demanda(_serie([1, 40, 2, 35, 1, 50, 3, 2, 45, 1, 30, 2]))
+    assert variable["tipo"] == "Variable"
+
+
+def test_la_ficha_muestra_como_se_vende(admin, producto_con_analitica):
+    assert "Cómo se vende" in texto(admin.get(f"/analitica/producto/{producto_con_analitica}"))

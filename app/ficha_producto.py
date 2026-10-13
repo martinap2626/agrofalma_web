@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import math
 from datetime import date
-from statistics import NormalDist
+from statistics import NormalDist, mean, pstdev
 
 # si el producto no tiene error medido, se usa un error típico según su confiabilidad (lo mismo que se le explica al usuario)
 ERROR_SEGUN_CONFIABILIDAD = {"Alta": 0.20, "Media": 0.40, "Baja": 0.70}
@@ -63,6 +63,12 @@ def riesgo_de_quiebre(stock, demanda: float, error: float, dias_reposicion: int,
     return {"probabilidad_pct": pct, "nivel": nivel, "espera": espera}
 
 
+def inicio_de_ventana(hasta: date, meses: int = 12) -> date:
+    """Primer día del mes más antiguo de la ventana de `meses` meses que termina en el mes de `hasta`."""
+    indice = hasta.year * 12 + (hasta.month - 1) - (meses - 1)
+    return date(indice // 12, indice % 12 + 1, 1)
+
+
 def ventas_por_mes(filas, hasta: date, meses: int = 12) -> list[dict]:
     """
     filas: pares (fecha, cantidad). Devuelve una fila por cada uno de los últimos `meses` meses (incluido el de `hasta`), en orden
@@ -84,3 +90,30 @@ def ventas_por_mes(filas, hasta: date, meses: int = 12) -> list[dict]:
     maximo = max(total.values()) or 1
     return [{"anio": a, "mes": m, "etiqueta": f"{m:02d}/{a}", "unidades": total[(a, m)], "ancho_pct": round(total[(a, m)] * 100 / maximo)}
             for a, m in claves]
+
+
+def patron_de_demanda(meses: list[dict]) -> dict:
+    """
+    Clasifica cómo se vende el producto con sus últimos 12 meses (la salida de `ventas_por_mes`), para explicarlo en palabras:
+    sin ventas, esporádica (3 meses o menos con venta), de temporada (casi todo se vende en pocos meses), regular (vende casi
+    todos los meses y sin grandes saltos) o variable (todo lo demás). Devuelve el tipo, un texto y los meses fuertes.
+    """
+    unidades = [m["unidades"] for m in meses]
+    total, con_venta = sum(unidades), sum(1 for u in unidades if u > 0)
+    n = len(unidades)
+    if total == 0:
+        return {"tipo": "Sin ventas", "texto": f"No se registraron ventas en estos {n} meses.", "meses_fuertes": []}
+    fuertes = [m["etiqueta"] for m in sorted(meses, key=lambda m: -m["unidades"])[:3] if m["unidades"] > 0]
+    if con_venta <= 3:
+        return {"tipo": "Esporádica", "texto": f"Se vendió en solo {con_venta} de {n} meses: la venta es ocasional y difícil de anticipar.",
+                "meses_fuertes": fuertes}
+    concentracion = sum(sorted(unidades, reverse=True)[:3]) / total
+    if concentracion >= 0.70 and con_venta <= 8:
+        return {"tipo": "De temporada", "texto": f"El {round(concentracion * 100)} % de lo vendido se concentró en 3 meses ({', '.join(fuertes)}): "
+                                                 "conviene tener stock antes de esos meses.", "meses_fuertes": fuertes}
+    variacion = pstdev(unidades) / mean(unidades)
+    if con_venta >= 10 and variacion <= 0.60:
+        return {"tipo": "Regular", "texto": f"Se vendió en {con_venta} de {n} meses y sin grandes saltos: la venta es estable.",
+                "meses_fuertes": fuertes}
+    return {"tipo": "Variable", "texto": f"Se vendió en {con_venta} de {n} meses con cambios marcados de un mes a otro; los meses más fuertes fueron "
+                                         f"{', '.join(fuertes)}.", "meses_fuertes": fuertes}
