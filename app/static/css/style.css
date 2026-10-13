@@ -276,6 +276,72 @@ a { text-decoration: none; color: inherit; }
 .boton-peligro:hover { background: var(--rojo-boton); color: #fff; }
 .celda-acciones .boton-peligro, .celda-acciones .boton-secundario { padding: 6px 12px; font-size: 13px; }
 
+/* explicación corta de un término (ícono «i» junto al encabezado de una columna): globo al pasar el mouse o enfocar con el teclado */
+.info-termino {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-left: 5px;
+    border-radius: 50%;
+    background: #e4f3ea;
+    color: var(--verde-primario);
+    font-size: 11px;
+    font-weight: 700;
+    font-style: normal;
+    text-transform: none;
+    letter-spacing: 0;
+    cursor: help;
+    vertical-align: middle;
+}
+.info-termino:hover::after, .info-termino:focus::after {
+    content: attr(data-ayuda);
+    position: absolute;
+    top: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    width: 250px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: #22261f;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+    text-align: left;
+    white-space: normal;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+/* simulador de escenarios (asistente de tres preguntas) */
+.paso-simulador { margin-bottom: 18px; }
+.paso-simulador legend, .paso-simulador .titulo-paso { font-size: 15px; font-weight: 700; padding: 0; margin-bottom: 8px; }
+.paso-simulador fieldset { border: none; padding: 0; margin: 0; min-width: 0; }
+.opcion-escenario {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 9px 12px;
+    margin: 0 0 6px;
+    border: 1px solid var(--borde);
+    border-radius: 8px;
+    font-weight: 400;
+    font-size: 14px;
+    cursor: pointer;
+}
+.opcion-escenario:has(input[type="radio"]:checked) { border-color: var(--verde-primario); background: #f1f8f4; }
+.opcion-escenario input[type="radio"] { width: auto; margin: 0; }
+.opcion-escenario input[type="number"] { width: 110px; padding: 6px 8px; }
+.resultado-simulador { border-left: 5px solid var(--verde-primario); }
+.frase-resultado { margin: 8px 0; padding: 8px 12px; border-radius: 6px; background: #f4f6f4; font-size: 15px; line-height: 1.5; }
+.frase-resultado.alerta { background: #fdeceb; color: #7a1f1f; }
+.frase-resultado.bien { background: #e4f3ea; color: #1b4d31; }
+.grafico-simulador { position: relative; height: 320px; }
+
 /* aviso de venta anulada en su detalle */
 .aviso-anulada {
     margin-top: 12px;

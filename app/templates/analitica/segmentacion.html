@@ -21,8 +21,28 @@
     </div>
 </div>
 
+{% if resumen and resumen.total %}
+<div class="grid-kpis">
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Clase A {{ info('Pocos productos que concentran la mayor parte de las ventas (cerca del 80 %). Nunca deberían quedarse sin stock.') }}</div>
+        <div class="valor-kpi">{{ resumen.n['A'] }} productos</div>
+        <div class="etiqueta-kpi"><small>{{ "%.0f"|format(resumen.ventas_pct['A']) }} % de las ventas · {{ "%.0f"|format(resumen.n['A'] / resumen.total * 100) }} % del catálogo</small></div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Clase B {{ info('Peso intermedio en las ventas (cerca del 15 %). Seguimiento periódico.') }}</div>
+        <div class="valor-kpi">{{ resumen.n['B'] }} productos</div>
+        <div class="etiqueta-kpi"><small>{{ "%.0f"|format(resumen.ventas_pct['B']) }} % de las ventas</small></div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Clase C {{ info('Muchos productos de poco movimiento (cerca del 5 %). Conviene no sobrecomprarlos.') }}</div>
+        <div class="valor-kpi">{{ resumen.n['C'] }} productos</div>
+        <div class="etiqueta-kpi"><small>{{ "%.0f"|format(resumen.ventas_pct['C']) }} % de las ventas{% if resumen.sin_ventas %} · {{ resumen.sin_ventas }} sin ventas{% endif %}</small></div>
+    </div>
+</div>
+{% endif %}
+
 {% if ejecucion %}
-<details class="tarjeta explicacion" open>
+<details class="tarjeta explicacion">
     <summary>¿Cómo se calcula la clase y para qué sirve?</summary>
     <p>
         Se suman las <strong>ventas en soles de los últimos 12 meses</strong> de cada producto, se ordenan de mayor a menor y se van
@@ -56,7 +76,7 @@
                 <th>Categoría</th>
                 <th>Periodo</th>
                 <th>Ventas del periodo</th>
-                <th>% acumulado</th>
+                <th>% acumulado {{ info('Porcentaje de las ventas que suman este producto y todos los que venden más que él. Los que llegan al 80 % son clase A.') }}</th>
                 <th>Clase</th>
                 <th>Calculado</th>
             </tr>
@@ -107,7 +127,7 @@
                 <th>Categoría</th>
                 <th>Periodo</th>
                 <th>Ventas del periodo</th>
-                <th>% acumulado</th>
+                <th>% acumulado {{ info('Porcentaje de las ventas que suman este producto y todos los que venden más que él. Los que llegan al 80 % son clase A.') }}</th>
                 <th>Clase</th>
             </tr>
         </thead>

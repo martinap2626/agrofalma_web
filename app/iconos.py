@@ -9,7 +9,7 @@ Uso en las plantillas:  {{ icono('editar') }}   o   {{ icono('papelera', 20) }}
 Trazados basados en el conjunto Feather (licencia MIT).
 """
 
-from markupsafe import Markup
+from markupsafe import Markup, escape
 
 _TRAZOS = {
     "editar": '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>',
@@ -26,6 +26,13 @@ _TRAZOS = {
     ),
     "anular": '<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>',
 }
+
+
+# explicación corta de un término, junto al encabezado de una columna o a una cifra: se ve al pasar el mouse o al enfocarla con el
+# teclado (tabulador), y los lectores de pantalla leen el texto completo; así no hace falta leer párrafos largos arriba de la tabla
+def info(texto: str) -> Markup:
+    seguro = escape(texto)
+    return Markup(f'<span class="info-termino" tabindex="0" role="note" aria-label="{seguro}" data-ayuda="{seguro}">i</span>')
 
 
 # devuelve el SVG del ícono pedido; si el nombre no existe falla de inmediato (así un error de tipeo no pasa desapercibido)

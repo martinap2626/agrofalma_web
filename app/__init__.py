@@ -83,9 +83,10 @@ def create_app(config_class=Config):
     app.after_request(aplicar_cabeceras)
 
     # íconos SVG disponibles en todas las plantillas: {{ icono('editar') }}
-    from app.iconos import icono
+    from app.iconos import icono, info
 
     app.jinja_env.globals["icono"] = icono
+    app.jinja_env.globals["info"] = info  # {{ info('explicación corta') }} junto a un término
 
     # --- Ruta raíz: redirige al dashboard de cada rol (o al login) --------
     # manda a cada quien a su pantalla segun si esta logueado y su rol

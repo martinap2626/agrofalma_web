@@ -135,9 +135,9 @@
     <p>Tiene cinco pantallas, que se leen juntas para decidir qué reponer y cuánto:</p>
     <ul>
         <li><strong>Recomendaciones de abastecimiento:</strong> combinan la predicción de demanda y la clase ABC para decir cuánto conviene tener disponible de cada producto (<em>stock objetivo</em>) y cuándo reponer (<em>punto de reposición</em>). Con inventario cargado indican cuánto <em>reponer</em> y la urgencia (<em>Urgente</em>, <em>Media</em>, <em>Sin acción</em>); sin inventario muestran el <em>plan</em> ordenado por prioridad. La explicación de cada cálculo está en la propia pantalla.</li>
-        <li><strong>Predicción de demanda:</strong> cuánto conviene tener listo el próximo periodo. <em>Cantidad sugerida a reponer</em> ya viene redondeada hacia arriba. <em>Tendencia</em> compara contra el mes pasado y <em>Confiabilidad</em> (Alta, Media o Baja) indica qué tan bien le ha ido al modelo con ese tipo de producto.</li>
+        <li><strong>Predicción de demanda:</strong> cuánto conviene tener listo el próximo periodo. La <em>Venta esperada</em> son las unidades que se espera vender (no lo que hay que comprar: eso lo dice Recomendaciones). <em>Tendencia</em> compara contra el mes pasado y <em>Confiabilidad</em> (Alta, Media o Baja) indica qué tan bien le ha ido al modelo con ese tipo de producto.</li>
         <li><strong>Plan de campaña:</strong> cuánto se espera vender de cada producto en toda la campaña (grande: enero a junio; chica: julio a diciembre), cuánto va vendido y cuánto falta. Sirve para planificar las compras grandes; se corrige solo a medida que avanza la campaña.</li>
-        <li><strong>Simulador de escenarios:</strong> responde «¿qué pasa si…?»: elige un producto, cambia la demanda esperada (por ejemplo +30 %), los días de reposición o el stock, y compara con la recomendación normal. No guarda nada.</li>
+        <li><strong>Simulador de escenarios:</strong> responde «¿qué pasa si…?» en tres pasos: elige el producto, elige qué crees que pasará (se vende más o menos, la reposición demora, o tú indicas la venta) y cuánto stock tienes hoy. Te cuenta en palabras para cuántos días alcanza el stock, cuándo se agotaría y cuánto conviene reponer, con un gráfico día a día. No guarda nada.</li>
         <li><strong>Segmentación ABC:</strong> ordena los productos por su peso en las ventas de los últimos 12 meses. Ver el glosario.</li>
     </ul>
     <p class="texto-ayuda">Son una guía para decidir, no una orden: tu conocimiento de la campaña y de los clientes sigue siendo clave. Con confiabilidad Baja, tómalo con más cautela.</p>
@@ -259,10 +259,12 @@
             <strong>B:</strong> peso intermedio (cerca del 15%); seguimiento periódico.
             <strong>C:</strong> muchos productos de poco movimiento (cerca del 5%); conviene no sobrecomprar.
         </dd>
-        <dt>Demanda prevista</dt>
-        <dd>Cantidad que el modelo estima que se venderá en el próximo periodo, según el historial.</dd>
-        <dt>Cantidad sugerida a reponer</dt>
-        <dd>Unidades que conviene tener listas, ya redondeadas hacia arriba.</dd>
+        <dt>Venta esperada (demanda prevista)</dt>
+        <dd>Cantidad que el modelo estima que se venderá en el próximo periodo, según el historial, redondeada hacia arriba. No es lo que hay que comprar.</dd>
+        <dt>Reponer</dt>
+        <dd>Unidades que faltan para llegar a «Tener disponible»: lo que conviene tener menos el stock que ya hay.</dd>
+        <dt>Tener disponible</dt>
+        <dd>Lo mismo que el <em>stock objetivo</em>: hasta cuánto conviene tener de un producto.</dd>
         <dt>Plan de campaña</dt>
         <dd>Estimación de lo que se venderá de cada producto en una campaña completa. La campaña grande va de enero a junio y la chica de julio a diciembre.</dd>
         <dt>Ritmo de la campaña</dt>

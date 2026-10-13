@@ -15,6 +15,7 @@ no son el resultado real de evaluación del modelo.
 """
 
 from datetime import date, timedelta
+from decimal import Decimal
 
 from flask import Blueprint, render_template, request, flash
 from flask_login import login_required
@@ -25,7 +26,8 @@ from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
 from app.extensions import db
 import json
 
-from analitica_job.pipeline.recomendaciones import PARAMETROS, simular
+from analitica_job.pipeline.recomendaciones import PARAMETROS
+from app.simulador import ESCENARIOS, LIMITES, calcular, leer_entrada
 from app.servicios_analitica import ultima_ejecucion
 from app.models import (
     EventoNegocio,
@@ -94,6 +96,22 @@ def _info_modelo(ejecucion):
 ORDEN_URGENCIA = {"urgente": 0, "media": 1, "plan": 1, "sin_accion": 2}
 
 
+# cifras de las tarjetas de resumen de Recomendaciones: cuántos hay en cada nivel y cuánto habría que reponer
+def resumir_recomendaciones(todas):
+    por_nivel = {n: [r for r in todas if r.nivel_urgencia == n] for n in ("urgente", "media", "sin_accion", "plan")}
+    a_reponer = por_nivel["urgente"] + por_nivel["media"]
+    return {
+        "urgentes": len(por_nivel["urgente"]), "medias": len(por_nivel["media"]), "sin_accion": len(por_nivel["sin_accion"]),
+        "plan": len(por_nivel["plan"]),
+        "clase_a_urgentes": sum(1 for r in por_nivel["urgente"] if r.clase_abc == "A"),
+        "clase_a_plan": sum(1 for r in por_nivel["plan"] if r.clase_abc == "A"),
+        "unidades_reponer": sum(r.cantidad_sugerida or 0 for r in a_reponer),
+        # valor de referencia: a PRECIO DE VENTA (el sistema no guarda el costo de compra o producción)
+        "valor_referencia": float(sum(Decimal(r.cantidad_sugerida or 0) * (r.producto.precio_unitario or 0) for r in a_reponer)),
+        "unidades_plan": sum(r.stock_objetivo or 0 for r in por_nivel["plan"]),
+    }
+
+
 # pantalla de recomendaciones de abastecimiento: cruza demanda prevista vs.
 # stock actual y explica en texto plano por que se sugiere cada accion
 @bp.route("")
@@ -103,22 +121,23 @@ def recomendaciones():
     filtro_urgencia = request.args.get("urgencia", "").strip()
 
     try:
-        consulta = RecomendacionAbastecimiento.query.options(
+        # se traen todas (son una por producto) para que las tarjetas de resumen cuenten el total sin importar el filtro elegido
+        todas = RecomendacionAbastecimiento.query.options(
             db.joinedload(RecomendacionAbastecimiento.producto),
             db.joinedload(RecomendacionAbastecimiento.sede),
-        )
-        if filtro_urgencia in ("urgente", "media", "sin_accion", "plan"):
-            consulta = consulta.filter(RecomendacionAbastecimiento.nivel_urgencia == filtro_urgencia)
-        filas = consulta.all()
-        hay_plan = RecomendacionAbastecimiento.query.filter_by(nivel_urgencia="plan").count() > 0
-        hay_inventario = RecomendacionAbastecimiento.query.filter_by(con_inventario=True).count() > 0
+        ).all()
     except SQLAlchemyError as error:
         registrar_error_conexion("listar recomendaciones de abastecimiento", error)
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return render_template(
             "analitica/recomendaciones.html", recomendaciones=[], filtro_urgencia=filtro_urgencia, ejecucion=None,
-            parametros=PARAMETROS, hay_plan=False, hay_inventario=False,
+            parametros=PARAMETROS, hay_plan=False, hay_inventario=False, resumen=None,
         ), 503
+
+    hay_plan = any(r.nivel_urgencia == "plan" for r in todas)
+    hay_inventario = any(r.con_inventario for r in todas)
+    resumen = resumir_recomendaciones(todas)
+    filas = [r for r in todas if filtro_urgencia not in ("urgente", "media", "sin_accion", "plan") or r.nivel_urgencia == filtro_urgencia]
 
     # las mas urgentes arriba, y dentro de cada nivel, la que tiene mayor
     # demanda prevista primero (es la que mas impacto tiene si se agota)
@@ -129,6 +148,7 @@ def recomendaciones():
     return render_template(
         "analitica/recomendaciones.html", recomendaciones=filas, filtro_urgencia=filtro_urgencia,
         ejecucion=_ejecucion_o_none(), parametros=PARAMETROS, hay_plan=hay_plan, hay_inventario=hay_inventario,
+        resumen=resumen,
     )
 
 
@@ -185,8 +205,8 @@ def campana():
     )
 
 
-# simulador de escenarios: recalcula la recomendacion de un producto con otra demanda, otro tiempo de reposicion o otro stock
-# (no guarda nada; sirve para decidir "que pasaria si ...")
+# simulador de escenarios: el usuario elige un producto y un escenario listo y ve, en palabras y en un gráfico, cuánto se vendería,
+# cuándo se agotaría el stock y cuánto conviene reponer (no guarda nada; sirve para decidir "qué pasaría si ...")
 @bp.route("/simulador")
 @login_required
 @rol_requerido("Administrador")
@@ -197,38 +217,20 @@ def simulador():
     except SQLAlchemyError as error:
         registrar_error_conexion("abrir simulador de escenarios", error)
         flash(MENSAJE_ERROR_CONEXION, "danger")
-        return render_template("analitica/simulador.html", recs=[], rec=None, base=None, escenario=None, ejecucion=None,
-                               parametros=PARAMETROS, form={}), 503
-
-    def numero(nombre, defecto, minimo, maximo):
-        try:
-            v = float(request.args.get(nombre, "").replace(",", "."))
-            return v if minimo <= v <= maximo and v == v else defecto
-        except ValueError:
-            return defecto
+        return render_template("analitica/simulador.html", recs=[], rec=None, resultado=None, entrada=None, ejecucion=None,
+                               parametros=PARAMETROS, escenarios=ESCENARIOS, limites=LIMITES, stock_registrado=None), 503
 
     id_txt = request.args.get("id_producto", "").strip()
     rec = next((r for r in recs if str(r.id_producto) == id_txt), None)
-    base = escenario = None
-    form = {}
+    resultado = entrada = stock_registrado = None
     if rec is not None:
-        modo = request.args.get("modo", "pct")
-        modo = modo if modo in ("pct", "unid", "total") else "pct"
-        limite = 500.0 if modo == "pct" else 1_000_000.0
-        cambio = numero("cambio", 0.0, -90.0 if modo == "pct" else -1_000_000.0, limite)
-        dias = int(numero("dias", float(PARAMETROS.tiempo_reposicion_dias), 1, 120))
-        stock_txt = request.args.get("stock", "").strip()
-        stock = numero("stock", None, 0, 1_000_000) if stock_txt else (rec.stock_actual if rec.con_inventario else None)
-        form = {"id_producto": rec.id_producto, "cambio": cambio, "modo": modo, "dias": dias, "stock": "" if stock is None else int(stock)}
-        D, margen = float(rec.demanda_prevista), float(rec.stock_seguridad or 0)
-        # el cambio se puede expresar en porcentaje, en unidades a sumar o restar, o como la demanda total del mes
-        nueva = {"pct": D * (1 + cambio / 100.0), "unid": D + cambio, "total": cambio}[modo]
-        base = simular(D, margen, rec.clase_abc, 0, PARAMETROS.tiempo_reposicion_dias, stock)
-        escenario = simular(D, margen, rec.clase_abc, 0, dias, stock, demanda_escenario=max(0.0, nueva))
-        escenario["cambio_unidades"] = escenario["demanda"] - D
-        escenario["cambio_pct"] = ((escenario["demanda"] - D) / D * 100) if D > 0 else None
-    return render_template("analitica/simulador.html", recs=recs, rec=rec, base=base, escenario=escenario,
-                           ejecucion=_ejecucion_o_none(), parametros=PARAMETROS, form=form)
+        # el stock registrado es el valor de partida; el usuario puede escribir otro (por ejemplo, el que contó hoy)
+        stock_registrado = rec.stock_actual if rec.con_inventario else None
+        entrada = leer_entrada(request.args, stock_registrado)
+        resultado = calcular(rec, entrada)
+    return render_template("analitica/simulador.html", recs=recs, rec=rec, resultado=resultado, entrada=entrada,
+                           ejecucion=_ejecucion_o_none(), parametros=PARAMETROS, escenarios=ESCENARIOS, limites=LIMITES,
+                           stock_registrado=stock_registrado)
 
 
 # pantalla de prediccion de demanda: una fila por producto con su ultima
@@ -267,6 +269,17 @@ def prediccion():
     # mayor demanda estimada primero, es la que mas le importa al gerente
     filas.sort(key=lambda p: -float(p.demanda_estimada))
 
+    # cifras de las tarjetas de resumen
+    resumen = {
+        "unidades": sum(float(p.demanda_estimada) for p in filas),
+        "periodo": next((p.periodo_objetivo for p in filas if p.periodo_objetivo), None),
+        "alta": sum(1 for p in filas if p.confiabilidad == "Alta"),
+        "media": sum(1 for p in filas if p.confiabilidad == "Media"),
+        "baja": sum(1 for p in filas if p.confiabilidad not in ("Alta", "Media")),
+        "sube": sum(1 for p in filas if p.venta_mes_anterior and p.tendencia_pct and p.tendencia_pct > 0),
+        "baja_tendencia": sum(1 for p in filas if p.venta_mes_anterior and p.tendencia_pct and p.tendencia_pct < 0),
+    }
+
     # vista previa con datos reales del historico (Excel), identificados por
     # nombre de producto mientras el catalogo real no este en MySQL -- ver
     # app/models/prediccion_demanda_preview.py. No crítica: si falla, la
@@ -300,7 +313,7 @@ def prediccion():
 
     return render_template(
         "analitica/prediccion.html", predicciones=filas, vista_previa=vista_previa, ejecucion=ejecucion, clases=clases,
-        modelo=_info_modelo(ejecucion), eventos_por_producto=eventos_por_producto,
+        modelo=_info_modelo(ejecucion), eventos_por_producto=eventos_por_producto, resumen=resumen,
     )
 
 
@@ -313,21 +326,28 @@ def segmentacion():
     filtro_clase = request.args.get("clase", "").strip().upper()
 
     try:
-        consulta = SegmentacionProducto.query.options(
-            db.joinedload(SegmentacionProducto.producto)
-        )
-        if filtro_clase in ("A", "B", "C"):
-            consulta = consulta.filter(SegmentacionProducto.clase_abc == filtro_clase)
-        filas = consulta.all()
+        # se traen todos (uno por producto) para que las tarjetas de resumen cuenten el total sin importar el filtro de clase
+        todas = SegmentacionProducto.query.options(db.joinedload(SegmentacionProducto.producto)).all()
     except SQLAlchemyError as error:
         registrar_error_conexion("listar segmentacion de productos", error)
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return render_template(
-            "analitica/segmentacion.html", segmentaciones=[], filtro_clase=filtro_clase, ejecucion=None
+            "analitica/segmentacion.html", segmentaciones=[], filtro_clase=filtro_clase, ejecucion=None, resumen=None
         ), 503
 
+    filas = [s for s in todas if filtro_clase not in ("A", "B", "C") or s.clase_abc == filtro_clase]
     # orden de Pareto: de mayor a menor participacion en las ventas
     filas.sort(key=lambda s: float(s.pct_acumulado))
+
+    # cifras de las tarjetas de resumen: cuántos productos hay en cada clase y qué parte de las ventas concentra cada una
+    ventas_total = sum(float(s.ventas_periodo) for s in todas)
+    por_clase = {c: [s for s in todas if s.clase_abc == c] for c in ("A", "B", "C")}
+    resumen = {
+        "total": len(todas), "ventas_total": ventas_total,
+        "n": {c: len(v) for c, v in por_clase.items()},
+        "ventas_pct": {c: (sum(float(s.ventas_periodo) for s in v) / ventas_total * 100 if ventas_total else 0) for c, v in por_clase.items()},
+        "sin_ventas": sum(1 for s in todas if float(s.ventas_periodo) == 0),
+    }
 
     # vista previa con datos reales del historico (Excel) -- ver
     # app/models/segmentacion_producto_preview.py. No critica: si falla, la
@@ -349,4 +369,5 @@ def segmentacion():
         filtro_clase=filtro_clase,
         vista_previa=vista_previa,
         ejecucion=ejecucion,
+        resumen=resumen,
     )

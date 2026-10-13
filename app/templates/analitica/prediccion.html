@@ -12,7 +12,25 @@
 </div>
 
 {% if ejecucion %}
-<details class="tarjeta explicacion" open>
+{% if resumen and predicciones %}
+<div class="grid-kpis">
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Unidades que se esperan vender{% if resumen.periodo %} en {{ resumen.periodo.strftime('%m/%Y') }}{% endif %} {{ info('Suma de la venta esperada de todos los productos para ese mes.') }}</div>
+        <div class="valor-kpi">{{ "{:,.0f}".format(resumen.unidades).replace(",", " ") }}</div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Confiabilidad Alta / Media / Baja {{ info('Qué tan bien acertó el método con cada producto en los últimos 8 meses. Con confiabilidad Baja, tómalo solo como referencia.') }}</div>
+        <div class="valor-kpi">{{ resumen.alta }} / {{ resumen.media }} / {{ resumen.baja }}</div>
+        <div class="etiqueta-kpi"><small>productos</small></div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Productos que suben / bajan {{ info('Comparan la venta esperada con lo vendido el mes pasado. En productos de campaña pueden bajar solo porque terminó la temporada.') }}</div>
+        <div class="valor-kpi">{{ resumen.sube }} / {{ resumen.baja_tendencia }}</div>
+        <div class="etiqueta-kpi"><small>frente al mes pasado</small></div>
+    </div>
+</div>
+{% endif %}
+<details class="tarjeta explicacion">
     <summary>¿Cómo se calcula esta predicción y cómo leerla?</summary>
     <p>
         El sistema estima <strong>cuántas unidades de cada producto se venderán el próximo mes</strong>, a partir de las ventas
@@ -26,9 +44,11 @@
             clase <strong>{{ clase }}</strong>: {{ nombre }}{{ '; ' if not loop.last else '.' }}
             {% endfor %}
         </li>
-        <li><strong>Cantidad sugerida a reponer:</strong> la demanda esperada del mes, redondeada hacia arriba. Con ella y con el
-            margen de seguridad se arman las <a href="{{ url_for('analitica.recomendaciones') }}">recomendaciones de abastecimiento</a>.</li>
-        <li><strong>Tendencia:</strong> compara lo pronosticado con lo que se vendió el mes pasado.</li>
+        <li><strong>Venta esperada:</strong> las unidades que se espera vender ese mes, redondeadas hacia arriba. <em>No es lo que hay que
+            comprar</em>: para saber cuánto reponer, las <a href="{{ url_for('analitica.recomendaciones') }}">recomendaciones de abastecimiento</a>
+            descuentan el stock que ya hay y suman un margen de seguridad.</li>
+        <li><strong>Tendencia:</strong> compara lo pronosticado con lo que se vendió el mes pasado. En productos de campaña puede indicar
+            «baja» solo porque terminó la temporada, no porque el producto se venda peor.</li>
         <li><strong>Confiabilidad:</strong> qué tan bien acertó el método con <em>ese</em> producto en los últimos 8 meses:
             <span class="etiqueta etiqueta-activo">Alta</span> (error bajo y ventas casi todos los meses),
             <span class="etiqueta etiqueta-pendiente">Media</span>,
@@ -51,9 +71,9 @@
                 <th>Categoría</th>
                 <th>Clase</th>
                 <th>Mes pronosticado</th>
-                <th>Cantidad sugerida a reponer</th>
-                <th>Tendencia</th>
-                <th>Confiabilidad</th>
+                <th>Venta esperada (unidades) {{ info('Cuántas unidades se espera vender el mes indicado. Para saber cuánto reponer mira Recomendaciones, que descuenta el stock y suma un margen de seguridad.') }}</th>
+                <th>Tendencia {{ info('Compara con lo vendido el mes pasado. En productos de campaña puede bajar solo porque terminó la temporada.') }}</th>
+                <th>Confiabilidad {{ info('Qué tan bien acertó el método con este producto en los últimos 8 meses: Alta, Media o Baja.') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -168,7 +188,7 @@
                 <th>Categoría</th>
                 <th>Clase</th>
                 <th>Periodo objetivo</th>
-                <th>Cantidad sugerida a reponer</th>
+                <th>Venta esperada (unidades)</th>
                 <th>Tendencia</th>
                 <th>Confiabilidad</th>
             </tr>

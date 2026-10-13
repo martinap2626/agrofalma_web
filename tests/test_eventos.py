@@ -241,26 +241,5 @@ def test_la_consulta_toma_ventas_del_sistema_y_no_las_importadas_del_historico(a
             db.session.commit()
 
 
-def test_el_simulador_acepta_el_cambio_en_porcentaje_unidades_o_demanda_total(app, admin):
-    from app.extensions import db
-    from app.models import Producto, RecomendacionAbastecimiento, Sede
-    with app.app_context():
-        p, sede = Producto.query.first(), Sede.query.first()
-        db.session.add(RecomendacionAbastecimiento(id_producto=p.id_producto, id_sede=sede.id_sede, stock_actual=None, demanda_prevista=40, stock_seguridad=10,
-                                                   cantidad_sugerida=60, nivel_urgencia="plan", motivo="x", clase_abc="A"))
-        db.session.commit()
-        id_producto = p.id_producto
-    try:
-        def demanda(modo, valor):
-            html = texto(admin.get(f"/analitica/simulador?id_producto={id_producto}&modo={modo}&cambio={valor}"))
-            fila = html[html.index("Demanda del mes"):]
-            return int(fila.split("<strong>")[1].split("</strong>")[0])
-        assert demanda("pct", 25) == 50       # 40 + 25 %
-        assert demanda("unid", 10) == 50      # 40 + 10 unidades
-        assert demanda("unid", -15) == 25     # 40 - 15 unidades
-        assert demanda("total", 70) == 70     # demanda total del mes
-        assert demanda("total", -5) == 0      # nunca negativa
-    finally:
-        with app.app_context():
-            RecomendacionAbastecimiento.query.delete()
-            db.session.commit()
+# (La prueba del simulador con los modos «porcentaje, unidades y demanda total» se reemplazó: la pantalla ahora trabaja con
+#  escenarios listos y esos casos se prueban en tests/test_simulador_y_explicabilidad.py)

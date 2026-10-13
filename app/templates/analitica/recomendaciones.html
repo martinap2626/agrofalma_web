@@ -25,8 +25,44 @@
     </div>
 </div>
 
+{% if resumen and (resumen.urgentes or resumen.medias or resumen.sin_accion or resumen.plan) %}
+<div class="grid-kpis">
+    {% if hay_inventario %}
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Productos urgentes {{ info('Productos cuyo stock no alcanza para lo que se venderá mientras llega la reposición. Hay que reponerlos ya.') }}</div>
+        <div class="valor-kpi">{{ resumen.urgentes }}</div>
+        <div class="etiqueta-kpi"><small>{{ resumen.clase_a_urgentes }} de clase A</small></div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Para reponer pronto {{ info('Productos que ya llegaron al punto de reposición: conviene reponerlos en este ciclo de compra.') }}</div>
+        <div class="valor-kpi">{{ resumen.medias }}</div>
+        <div class="etiqueta-kpi"><small>{{ resumen.sin_accion }} no necesitan reposición</small></div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Unidades por reponer <small>(urgentes y para reponer pronto)</small></div>
+        <div class="valor-kpi">{{ "{:,.0f}".format(resumen.unidades_reponer).replace(",", " ") }}</div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Valor de referencia {{ info('Lo que valdrían esas unidades a precio de venta. Es solo una referencia: el sistema no guarda el costo de compra o producción.') }}</div>
+        <div class="valor-kpi"><span class="monto">S/ {{ "{:,.0f}".format(resumen.valor_referencia).replace(",", " ") }}</span></div>
+        <div class="etiqueta-kpi"><small>a precio de venta</small></div>
+    </div>
+    {% else %}
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Productos en el plan</div>
+        <div class="valor-kpi">{{ resumen.plan }}</div>
+        <div class="etiqueta-kpi"><small>{{ resumen.clase_a_plan }} de prioridad alta (clase A)</small></div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Unidades que conviene tener disponibles {{ info('Suma de «Tener disponible» de todos los productos. Cuando se cargue el inventario, el sistema dirá cuánto falta reponer.') }}</div>
+        <div class="valor-kpi">{{ "{:,.0f}".format(resumen.unidades_plan).replace(",", " ") }}</div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
 {% if ejecucion %}
-<details class="tarjeta explicacion" open>
+<details class="tarjeta explicacion">
     <summary>¿Cómo se calculan estas recomendaciones?</summary>
     <p>
         Cada recomendación combina <strong>dos resultados</strong> del sistema: la
@@ -74,11 +110,11 @@
             <tr>
                 <th>Producto</th>
                 <th>Clase</th>
-                <th>{{ 'Prioridad' if hay_plan and not hay_inventario else 'Urgencia' }}</th>
-                <th>Stock actual</th>
-                <th>Demanda prevista</th>
-                <th>Tener disponible</th>
-                <th>Reponer</th>
+                <th>{{ 'Prioridad' if hay_plan and not hay_inventario else 'Urgencia' }} {{ info('Urgente: se acaba antes de que llegue la reposición. Media: ya toca reponer. Sin acción: por ahora alcanza. Prioridad (sin inventario): según la clase ABC.') }}</th>
+                <th>Stock actual {{ info('Lo que hay hoy registrado en el inventario.') }}</th>
+                <th>Venta esperada {{ info('Unidades que se espera vender el próximo mes (viene de la Predicción de demanda).') }}</th>
+                <th>Tener disponible {{ info('Hasta cuánto conviene tener: la venta esperada, más lo que se vende mientras llega la reposición, más un margen de seguridad.') }}</th>
+                <th>Reponer {{ info('Cuántas unidades comprar o producir para llegar a «Tener disponible»: lo que falta, descontando el stock actual.') }}</th>
                 <th>Por qué</th>
             </tr>
         </thead>
