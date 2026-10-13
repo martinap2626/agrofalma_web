@@ -7,13 +7,14 @@ la bitácora, de modo que sirva como evidencia confiable de quién hizo qué.
 
 from datetime import date, datetime, timedelta
 
-from flask import Blueprint, flash, render_template, request
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import login_required
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.decorators import rol_requerido
 from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
 from app.models import Bitacora
+from app.seguridad import registrar_accion, verificar_bitacora
 
 POR_PAGINA = 10
 
@@ -42,8 +43,17 @@ ETIQUETAS_ACCION = {
     "evento_editado": "Evento del negocio editado",
     "evento_eliminado": "Evento del negocio eliminado",
     "reporte_exportado": "Reporte exportado a CSV",
+    "exportacion_limitada": "Descarga de reporte bloqueada por exceso de descargas",
     "acceso_denegado": "Acceso denegado (sin permiso)",
     "csrf_rechazado": "Formulario rechazado (token inválido)",
+    "venta_anulada": "Venta anulada",
+    "venta_precio_rebajado": "Venta con precio por debajo del de lista",
+    "inventario_ingreso": "Ingreso de mercadería al inventario",
+    "inventario_conteo": "Conteo físico de inventario",
+    "contrasena_cambiada": "Contraseña cambiada por el propio usuario",
+    "contrasena_fallida": "Cambio de contraseña con la contraseña actual incorrecta",
+    "contrasena_bloqueada": "Cambio de contraseña bloqueado por intentos fallidos",
+    "bitacora_verificada": "Verificación de la integridad de la bitácora",
 }
 
 bp = Blueprint("auditoria", __name__, url_prefix="/auditoria")
@@ -107,3 +117,31 @@ def listar():
 
     contexto.update(registros=registros, total=total, total_paginas=total_paginas, pagina=pagina)
     return render_template("auditoria/listar.html", **contexto)
+
+
+# comprueba que nadie haya editado ni borrado filas de la bitácora directamente en la base de datos (cadena de huellas)
+@bp.route("/verificar", methods=["POST"])
+@login_required
+@rol_requerido("Administrador")
+def verificar():
+    try:
+        resultado = verificar_bitacora()
+    except SQLAlchemyError as error:
+        registrar_error_conexion("verificar la bitácora", error)
+        flash(MENSAJE_ERROR_CONEXION, "danger")
+        return redirect(url_for("auditoria.listar"))
+
+    if resultado["ok"]:
+        registrar_accion("bitacora_verificada", detalle=f"Íntegra: {resultado['verificadas']} filas verificadas")
+        flash(
+            f"La bitácora está íntegra: se verificaron {resultado['verificadas']} registros encadenados y no hay ninguno "
+            "alterado ni faltante.", "success",
+        )
+    else:
+        registrar_accion(
+            "bitacora_verificada", detalle=f"ALTERADA: {len(resultado['problemas'])} problema(s)", resultado="fallo",
+        )
+        flash("¡Atención! La bitácora fue alterada fuera del sistema. Avisa a quien administra el servidor.", "danger")
+        for problema in resultado["problemas"][:5]:
+            flash(problema, "danger")
+    return redirect(url_for("auditoria.listar"))

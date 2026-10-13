@@ -69,7 +69,7 @@
 <div class="tarjeta">
     <h3 style="margin-top:0">{{ rec.producto.nombre_producto }}</h3>
     <table class="tabla">
-        <thead><tr><th></th><th>Recomendación normal</th><th>Escenario simulado</th></tr></thead>
+        <thead><tr><th><span class="solo-lector">Concepto</span></th><th>Recomendación normal</th><th>Escenario simulado</th></tr></thead>
         <tbody>
             <tr><td>Demanda del mes (unidades)</td><td>{{ base.demanda|round(0)|int }}</td><td><strong>{{ escenario.demanda|round(0)|int }}</strong>
                 {% if escenario.cambio_unidades|round(0) != 0 %}<br><small>{{ '%+d'|format(escenario.cambio_unidades|round(0)|int) }} unidades{% if escenario.cambio_pct is not none %} ({{ '%+.0f'|format(escenario.cambio_pct) }} %){% endif %}</small>{% endif %}</td></tr>

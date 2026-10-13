@@ -11,6 +11,22 @@
     Sirve para identificar responsables y detectar accesos sospechosos.
 </p>
 
+<div class="tarjeta" style="margin-bottom:18px">
+    <form method="POST" action="{{ url_for('auditoria.verificar') }}" class="fila-formulario" style="align-items:center" data-una-vez>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div>
+            <strong>Integridad del registro</strong>
+            <p class="texto-ayuda" style="margin:4px 0 0">
+                Cada registro lleva una huella que depende del anterior, como los eslabones de una cadena. Si alguien edita o borra
+                un registro directamente en la base de datos, la cadena se rompe y esta revisión lo detecta.
+            </p>
+        </div>
+        <div style="flex:0; white-space:nowrap">
+            <button type="submit" class="boton-secundario" data-texto-enviando="Verificando...">Verificar integridad</button>
+        </div>
+    </form>
+</div>
+
 <form method="GET" class="tarjeta" style="margin-bottom:18px">
     <div class="fila-formulario">
         <div>

@@ -1,9 +1,14 @@
-Flask==3.0.3
+Flask==3.1.3
+Werkzeug==3.1.9
 Flask-SQLAlchemy==3.1.1
 Flask-Login==0.6.3
 Flask-WTF==1.3.0
+Flask-Migrate==4.1.0
 PyMySQL==1.1.1
-python-dotenv==1.0.1
+python-dotenv==1.2.2
+
+# cifrado de los respaldos de la base de datos (flask respaldar-bd)
+cryptography==50.0.1
 
 # componente analitico (Sprint 3): limpieza, modelado y persistencia del job offline
 pandas==3.0.5

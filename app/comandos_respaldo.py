@@ -4,13 +4,21 @@ sistema cuenta con respaldo básico"; y fiabilidad: recuperación sin pérdida
 de datos).
 
 Comandos:
-    flask respaldar-bd        Genera un volcado completo con mysqldump y aplica
-                              retención (borra los respaldos más antiguos).
+    flask respaldar-bd        Genera un volcado completo con mysqldump, lo comprime
+                              y lo cifra (si hay RESPALDO_CLAVE), aplica retención
+                              (borra los respaldos más antiguos) y deja una copia
+                              verificada fuera del equipo (si hay RESPALDO_COPIA_DIR).
     flask restaurar-bd ARCHIVO --destino NOMBRE_BD
-                              Restaura un respaldo en la base indicada.
+                              Restaura un respaldo (.sql, .sql.gz o .sql.gz.enc)
+                              en la base indicada.
     flask verificar-respaldo  Prueba automática de recuperación: respalda,
                               restaura en una base temporal, compara fila por
                               fila el conteo de cada tabla y mide el tiempo.
+
+Objetivos de recuperación (ver deploy/POLITICA_RESPALDO.md):
+    RPO (cuántos datos se pueden perder):  24 horas, con un respaldo diario.
+    RTO (cuánto tarda volver a funcionar): la restauración de la base toma segundos
+    (se mide en cada `flask verificar-respaldo`); con la instalación del servicio, menos de 1 hora.
 
 No corre solo: hay que dispararlo, ya sea a mano o mediante un programador
 externo -- cron en el servidor de producción (Linux), o el Programador de
@@ -28,6 +36,9 @@ mediante un archivo temporal de credenciales que se borra al terminar.
 
 from __future__ import annotations
 
+import base64
+import gzip
+import hashlib
 import os
 import re
 import shutil
@@ -40,10 +51,17 @@ from pathlib import Path
 
 import click
 import pymysql
+from cryptography.fernet import Fernet, InvalidToken
 
 CARPETA_RESPALDOS = Path(__file__).resolve().parent.parent / "respaldos"
 RESPALDOS_A_CONSERVAR = 7  # retencion: se borran los mas antiguos que estos
+RESPALDOS_EXTERNOS_A_CONSERVAR = 30  # la copia fuera del equipo guarda más historia (un mes de respaldos diarios)
 BD_TEMPORAL_VERIFICACION = "agrofalma_verificacion_tmp"
+
+# formatos de respaldo: .sql (volcado plano), .sql.gz (comprimido) y .sql.gz.enc (comprimido y cifrado)
+EXTENSIONES_RESPALDO = (".sql.gz.enc", ".sql.gz", ".sql")
+CABECERA_CIFRADO = b"AGFB1"  # marca y versión del formato cifrado
+TAMANO_BLOQUE = 1024 * 1024
 
 # sitios habituales donde MySQL deja sus herramientas en Windows
 _CARPETAS_WINDOWS = [
@@ -133,12 +151,114 @@ def _respaldo_completo(ruta: Path) -> bool:
         return b"Dump completed" in archivo.read()
 
 
+# respaldos de una carpeta (en cualquiera de los tres formatos), del más reciente al más antiguo
+def listar_respaldos(carpeta: Path) -> list[Path]:
+    if not carpeta.exists():
+        return []
+    encontrados = [p for p in carpeta.glob("agrofalma_bd_*") if p.name.endswith(EXTENSIONES_RESPALDO)]
+    return sorted(encontrados, key=lambda p: p.name, reverse=True)
+
+
 def aplicar_retencion(carpeta: Path, conservar: int) -> list[Path]:
-    respaldos = sorted(carpeta.glob("agrofalma_bd_*.sql"), key=lambda p: p.name, reverse=True)
-    a_borrar = respaldos[conservar:]
+    a_borrar = listar_respaldos(carpeta)[conservar:]
     for ruta in a_borrar:
         ruta.unlink()
     return a_borrar
+
+
+# ---------------------------------------------------------------------------
+# Compresión y cifrado del respaldo
+# ---------------------------------------------------------------------------
+# convierte la clave escrita por el usuario en una clave de cifrado; scrypt es costoso a propósito (frena adivinarla a fuerza bruta)
+def _clave_de_cifrado(clave: str, sal: bytes) -> bytes:
+    return base64.urlsafe_b64encode(hashlib.scrypt(clave.encode("utf-8"), salt=sal, n=2**14, r=8, p=1, dklen=32))
+
+
+def empaquetar_respaldo(ruta_sql: Path, clave: str | None) -> Path:
+    """
+    Comprime el volcado .sql (ocupa una décima parte) y, si hay clave, lo cifra (AES-128 con firma, vía Fernet, por bloques de
+    1 MB). Borra el .sql plano y devuelve la ruta final. Un respaldo cifrado no sirve de nada a quien se lleve el archivo
+    sin la clave, y cualquier alteración del archivo se detecta al restaurarlo.
+    """
+    ruta_gz = ruta_sql.with_name(ruta_sql.name + ".gz")
+    ruta_final = ruta_gz.with_name(ruta_gz.name + ".enc") if clave else ruta_gz
+    try:
+        with open(ruta_sql, "rb") as entrada, gzip.open(ruta_gz, "wb", compresslevel=6) as salida:
+            shutil.copyfileobj(entrada, salida, TAMANO_BLOQUE)
+        if clave:
+            sal = os.urandom(16)
+            fernet = Fernet(_clave_de_cifrado(clave, sal))
+            with open(ruta_gz, "rb") as entrada, open(ruta_final, "wb") as salida:
+                salida.write(CABECERA_CIFRADO + sal)
+                while bloque := entrada.read(TAMANO_BLOQUE):
+                    token = fernet.encrypt(bloque)
+                    salida.write(len(token).to_bytes(4, "big"))
+                    salida.write(token)
+            ruta_gz.unlink()
+    except Exception:
+        ruta_gz.unlink(missing_ok=True)
+        ruta_final.unlink(missing_ok=True)  # no dejar un respaldo a medias
+        raise
+    ruta_sql.unlink()
+    return ruta_final
+
+
+@contextmanager
+def abrir_respaldo(ruta: Path, clave: str | None):
+    """
+    Entrega la ruta de un .sql plano listo para restaurar, sea cual sea el formato del respaldo (.sql, .sql.gz o
+    .sql.gz.enc). Si hubo que descifrar o descomprimir, el archivo temporal se borra al terminar.
+    """
+    if ruta.name.endswith(".sql"):
+        yield ruta
+        return
+    carpeta = Path(tempfile.mkdtemp(prefix="agrofalma_restauracion_"))
+    try:
+        origen_gz = ruta
+        if ruta.name.endswith(".enc"):
+            if not clave:
+                raise RuntimeError("El respaldo está cifrado: define la clave en la variable de entorno RESPALDO_CLAVE.")
+            origen_gz = carpeta / "descifrado.sql.gz"
+            with open(ruta, "rb") as entrada, open(origen_gz, "wb") as salida:
+                if entrada.read(len(CABECERA_CIFRADO)) != CABECERA_CIFRADO:
+                    raise RuntimeError("El archivo no tiene el formato de respaldo cifrado de Agrofalma.")
+                fernet = Fernet(_clave_de_cifrado(clave, entrada.read(16)))
+                while longitud := entrada.read(4):
+                    try:
+                        salida.write(fernet.decrypt(entrada.read(int.from_bytes(longitud, "big"))))
+                    except InvalidToken as error:
+                        raise RuntimeError("No se pudo descifrar: la clave es incorrecta o el respaldo está dañado.") from error
+        sql = carpeta / "respaldo.sql"
+        with gzip.open(origen_gz, "rb") as entrada, open(sql, "wb") as salida:
+            shutil.copyfileobj(entrada, salida, TAMANO_BLOQUE)
+        yield sql
+    finally:
+        shutil.rmtree(carpeta, ignore_errors=True)
+
+
+# huella SHA-256 del archivo, para anotarla y poder comprobar después que no cambió
+def huella_archivo(ruta: Path) -> str:
+    resumen = hashlib.sha256()
+    with open(ruta, "rb") as archivo:
+        while bloque := archivo.read(TAMANO_BLOQUE):
+            resumen.update(bloque)
+    return resumen.hexdigest()
+
+
+def copiar_fuera_del_equipo(ruta: Path, carpeta_externa: Path, conservar: int) -> Path:
+    """
+    Copia el respaldo a una carpeta que NO está en este disco (disco externo, carpeta sincronizada con la nube, unidad de
+    red) y comprueba que la copia quedó idéntica. Si el equipo se pierde, se quema o lo encripta un virus, esa copia
+    sigue viva. Aplica su propia retención (por defecto, 30 respaldos).
+    """
+    carpeta_externa.mkdir(parents=True, exist_ok=True)
+    destino = carpeta_externa / ruta.name
+    shutil.copy2(ruta, destino)
+    if huella_archivo(destino) != huella_archivo(ruta):
+        destino.unlink(missing_ok=True)
+        raise RuntimeError(f"La copia en {carpeta_externa} no quedó idéntica al original; se descartó.")
+    aplicar_retencion(carpeta_externa, conservar)
+    return destino
 
 
 def _validar_nombre_bd(nombre: str) -> str:
@@ -215,28 +335,50 @@ def registrar_comando_respaldo(app) -> None:
         "--conservar", default=RESPALDOS_A_CONSERVAR,
         help=f"Cuántos respaldos recientes conservar (default: {RESPALDOS_A_CONSERVAR}).",
     )
-    def respaldar_bd(conservar):
-        """Genera un volcado completo de la base de datos con mysqldump y
-        aplica retención (borra los respaldos más antiguos que el límite)."""
+    @click.option(
+        "--conservar-externo", default=RESPALDOS_EXTERNOS_A_CONSERVAR,
+        help=f"Cuántos respaldos conservar en la copia fuera del equipo (default: {RESPALDOS_EXTERNOS_A_CONSERVAR}).",
+    )
+    def respaldar_bd(conservar, conservar_externo):
+        """Genera un volcado completo de la base de datos con mysqldump, lo comprime y lo cifra (si hay clave
+        RESPALDO_CLAVE), aplica retención y deja una copia fuera del equipo (si hay RESPALDO_COPIA_DIR)."""
         from config import Config
 
         CARPETA_RESPALDOS.mkdir(exist_ok=True)
-        ruta_destino = CARPETA_RESPALDOS / generar_nombre_archivo()
+        ruta_sql = CARPETA_RESPALDOS / generar_nombre_archivo()
+        clave = Config.RESPALDO_CLAVE or None
 
-        click.echo(f"Generando respaldo en {ruta_destino} ...")
+        click.echo(f"Generando respaldo en {ruta_sql.with_suffix('')} ...")
         try:
-            ejecutar_mysqldump(Config, ruta_destino)
-        except (RuntimeError, FileNotFoundError) as error:
+            ejecutar_mysqldump(Config, ruta_sql)
+            tamano_sql_mb = ruta_sql.stat().st_size / (1024 * 1024)
+            ruta_destino = empaquetar_respaldo(ruta_sql, clave)
+        except (RuntimeError, FileNotFoundError, OSError) as error:
             click.echo(f"ERROR: no se pudo generar el respaldo -- {error}", err=True)
             raise SystemExit(1)
 
         tamano_mb = ruta_destino.stat().st_size / (1024 * 1024)
-        click.echo(f"Respaldo generado correctamente ({tamano_mb:.2f} MB).")
+        click.echo(f"Respaldo generado correctamente: {ruta_destino.name} ({tamano_mb:.2f} MB; sin comprimir {tamano_sql_mb:.2f} MB).")
+        click.echo(f"Huella SHA-256: {huella_archivo(ruta_destino)}")
+        if clave:
+            click.echo("Cifrado: sí (AES). Sin la clave RESPALDO_CLAVE este archivo no se puede restaurar: guárdala en un lugar seguro.")
+        else:
+            click.echo("AVISO: el respaldo NO está cifrado. Define RESPALDO_CLAVE en el archivo .env para cifrarlo.", err=True)
 
         borrados = aplicar_retencion(CARPETA_RESPALDOS, conservar)
         if borrados:
             click.echo(f"Retención: se eliminaron {len(borrados)} respaldo(s) antiguos, "
                        f"se conservan los últimos {conservar}.")
+
+        if Config.RESPALDO_COPIA_DIR:
+            try:
+                copia = copiar_fuera_del_equipo(ruta_destino, Path(Config.RESPALDO_COPIA_DIR), conservar_externo)
+            except (RuntimeError, OSError) as error:
+                click.echo(f"ERROR: el respaldo local quedó bien, pero NO se pudo copiar fuera del equipo -- {error}", err=True)
+                raise SystemExit(2)
+            click.echo(f"Copia fuera del equipo verificada: {copia}")
+        else:
+            click.echo("AVISO: no hay copia fuera del equipo. Define RESPALDO_COPIA_DIR (disco externo, carpeta de la nube o unidad de red).", err=True)
 
     @app.cli.command("restaurar-bd")
     @click.argument("archivo", type=click.Path(exists=True, dir_okay=False, path_type=Path))
@@ -255,17 +397,19 @@ def registrar_comando_respaldo(app) -> None:
                 "o repite el comando con --sobrescribir si de verdad quieres reemplazar sus datos."
             )
 
-        conexion = _conectar(Config)
-        try:
-            with conexion.cursor() as cursor:
-                cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{destino}` CHARACTER SET utf8mb4")
-            conexion.commit()
-        finally:
-            conexion.close()
-
         inicio = time.perf_counter()
         try:
-            restaurar_respaldo(Config, archivo, destino)
+            # acepta .sql, .sql.gz y .sql.gz.enc (este último necesita RESPALDO_CLAVE). Primero se abre el respaldo y solo
+            # entonces se crea la base de destino: si la clave es incorrecta o el archivo está dañado, no queda una base vacía a medias
+            with abrir_respaldo(archivo, Config.RESPALDO_CLAVE or None) as ruta_sql:
+                conexion = _conectar(Config)
+                try:
+                    with conexion.cursor() as cursor:
+                        cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{destino}` CHARACTER SET utf8mb4")
+                    conexion.commit()
+                finally:
+                    conexion.close()
+                restaurar_respaldo(Config, ruta_sql, destino)
         except (RuntimeError, FileNotFoundError) as error:
             click.echo(f"ERROR: {error}", err=True)
             raise SystemExit(1)
@@ -280,29 +424,36 @@ def registrar_comando_respaldo(app) -> None:
 
         CARPETA_RESPALDOS.mkdir(exist_ok=True)
         ruta_sql = CARPETA_RESPALDOS / f"verificacion_{generar_nombre_archivo()}"
+        clave = Config.RESPALDO_CLAVE or None
+        paquete = None
 
         try:
             t0 = time.perf_counter()
-            click.echo("1/4 Generando respaldo ...")
+            click.echo("1/4 Generando respaldo (comprimido" + (" y cifrado" if clave else ", SIN cifrar") + ") ...")
             ejecutar_mysqldump(Config, ruta_sql)
+            tamano_sql_mb = ruta_sql.stat().st_size / (1024 * 1024)
+            paquete = empaquetar_respaldo(ruta_sql, clave)
             t_respaldo = time.perf_counter() - t0
-            tamano_mb = ruta_sql.stat().st_size / (1024 * 1024)
+            tamano_mb = paquete.stat().st_size / (1024 * 1024)
 
-            click.echo(f"2/4 Restaurando en la base temporal '{BD_TEMPORAL_VERIFICACION}' ...")
+            click.echo(f"2/4 Restaurando el respaldo empaquetado en la base temporal '{BD_TEMPORAL_VERIFICACION}' ...")
             _recrear_bd(Config, BD_TEMPORAL_VERIFICACION)
             t1 = time.perf_counter()
-            restaurar_respaldo(Config, ruta_sql, BD_TEMPORAL_VERIFICACION)
+            with abrir_respaldo(paquete, clave) as ruta_restauracion:
+                restaurar_respaldo(Config, ruta_restauracion, BD_TEMPORAL_VERIFICACION)
             t_restauracion = time.perf_counter() - t1
 
             click.echo("3/4 Comparando tabla por tabla ...")
             origen = contar_filas(Config, Config.DB_NAME)
             restaurada = contar_filas(Config, BD_TEMPORAL_VERIFICACION)
-        except (RuntimeError, FileNotFoundError) as error:
+        except (RuntimeError, FileNotFoundError, OSError) as error:
             click.echo(f"ERROR: {error}", err=True)
             raise SystemExit(1)
         finally:
             click.echo("4/4 Limpiando archivos y base temporal ...")
             ruta_sql.unlink(missing_ok=True)
+            if paquete is not None:
+                paquete.unlink(missing_ok=True)
             _eliminar_bd(Config, BD_TEMPORAL_VERIFICACION)
 
         diferencias = []
@@ -316,8 +467,9 @@ def registrar_comando_respaldo(app) -> None:
 
         total = sum(origen.values())
         click.echo(
-            f"\nTablas: {len(origen)} · Filas totales: {total} · Tamaño del respaldo: {tamano_mb:.2f} MB\n"
-            f"Tiempo de respaldo: {t_respaldo:.1f} s · Tiempo de restauración: {t_restauracion:.1f} s"
+            f"\nTablas: {len(origen)} · Filas totales: {total} · Tamaño del respaldo: {tamano_mb:.2f} MB (sin comprimir {tamano_sql_mb:.2f} MB)\n"
+            f"Tiempo de respaldo: {t_respaldo:.1f} s · Tiempo de restauración: {t_restauracion:.1f} s "
+            "(el tiempo de restauración es el RTO medido de la base de datos)"
         )
         if diferencias:
             click.echo(f"RESULTADO: FALLÓ. Tablas con diferencias: {', '.join(diferencias)}", err=True)

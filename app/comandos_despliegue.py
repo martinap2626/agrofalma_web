@@ -71,6 +71,17 @@ def diagnosticar(app) -> list[tuple[str, str, str]]:
         r.append((FALLO, "Tablas", f"Faltan {len(faltan)}: {', '.join(faltan[:6])}. Ejecuta: flask preparar-bd"))
     else:
         r.append((OK, "Tablas", f"Las {len(db.metadata.sorted_tables)} tablas existen."))
+        from app.esquema import esquema_pendiente
+
+        faltan_cambios = esquema_pendiente()
+        if faltan_cambios:
+            r.append((FALLO, "Esquema", f"A la base le falta: {', '.join(faltan_cambios[:5])}. Ejecuta: flask preparar-bd"))
+        else:
+            r.append((OK, "Esquema", "Columnas y restricciones al día."))
+        from app.migraciones import estado_migraciones
+
+        estado, mensaje = estado_migraciones()
+        r.append((OK if estado == "al_dia" else (FALLO if estado == "atrasada" else AVISO), "Migraciones", mensaje))
         sin_indice = 0
         for t in db.metadata.sorted_tables:
             existentes = {i["name"] for i in inspector.get_indexes(t.name)}
@@ -90,6 +101,14 @@ def diagnosticar(app) -> list[tuple[str, str, str]]:
         if inactivos:
             r.append((AVISO, "Usuarios", f"{inactivos} usuario(s) desactivado(s). Revisa que los trabajadores reales estén activos y con contraseña propia."))
 
+        from app.seguridad import verificar_bitacora
+
+        integridad = verificar_bitacora()
+        if integridad["ok"]:
+            r.append((OK, "Bitácora", f"Íntegra ({integridad['verificadas']} registros encadenados verificados)."))
+        else:
+            r.append((FALLO, "Bitácora", "Fue alterada fuera del sistema. Ejecuta: flask verificar-bitacora"))
+
         ejecucion = EjecucionAnalitica.query.order_by(EjecucionAnalitica.fecha_ejecucion.desc()).first()
         if ejecucion is None:
             r.append((AVISO, "Analítica", "Todavía no se ha calculado. Ejecuta: flask actualizar-analitica"))
@@ -103,12 +122,32 @@ def diagnosticar(app) -> list[tuple[str, str, str]]:
         r.append((AVISO, "Datos", f"No se pudieron revisar los datos: {str(e)[:100]}"))
 
     # ---- respaldo y registros
+    from app.comandos_respaldo import listar_respaldos
+
     carpeta = RAIZ / "respaldos"
-    recientes = [p for p in carpeta.glob("*.sql") if time.time() - p.stat().st_mtime < DIAS_RESPALDO_MAXIMO * 86400] if carpeta.exists() else []
+    recientes = [p for p in listar_respaldos(carpeta) if time.time() - p.stat().st_mtime < DIAS_RESPALDO_MAXIMO * 86400]
     if recientes:
         r.append((OK, "Respaldo", f"Hay un respaldo de los últimos {DIAS_RESPALDO_MAXIMO} días."))
     else:
         r.append((AVISO, "Respaldo", f"No hay respaldos de los últimos {DIAS_RESPALDO_MAXIMO} días. Programa: flask respaldar-bd (ver deploy/)."))
+
+    if cfg.get("RESPALDO_CLAVE"):
+        r.append((OK, "Cifrado de respaldos", "Los respaldos se cifran con RESPALDO_CLAVE (guárdala aparte: sin ella no se pueden restaurar)."))
+    else:
+        r.append((AVISO, "Cifrado de respaldos", "Los respaldos se guardan SIN cifrar. Define RESPALDO_CLAVE en el .env."))
+
+    copia = cfg.get("RESPALDO_COPIA_DIR")
+    if not copia:
+        r.append((AVISO, "Copia fuera del equipo", "No hay segunda copia. Define RESPALDO_COPIA_DIR (disco externo, carpeta de la nube o unidad de red)."))
+    else:
+        try:
+            Path(copia).mkdir(parents=True, exist_ok=True)
+            probar = Path(copia) / ".prueba"
+            probar.write_text("ok")
+            probar.unlink()
+            r.append((OK, "Copia fuera del equipo", f"Se puede escribir en {copia}."))
+        except OSError:
+            r.append((FALLO, "Copia fuera del equipo", f"No se puede escribir en {copia}: el disco externo o la unidad de red no está disponible."))
 
     log = cfg.get("LOG_ARCHIVO")
     if log:
@@ -130,6 +169,7 @@ def registrar_comandos_despliegue(app) -> None:
         """Crea las tablas, columnas e índices que falten, sin tocar los datos (se puede repetir sin problema)."""
         from sqlalchemy import inspect
 
+        from app.esquema import asegurar_esquema_plataforma
         from app.extensions import db
         from app.servicios_analitica import asegurar_esquema
 
@@ -139,6 +179,12 @@ def registrar_comandos_despliegue(app) -> None:
         for t in nuevas:
             click.echo(f"  tabla creada: {t}")
         for c in asegurar_esquema():
+            click.echo(f"  {c}")
+        for c in asegurar_esquema_plataforma():
+            click.echo(f"  {c}")
+        from app.migraciones import sincronizar_migraciones
+
+        for c in sincronizar_migraciones():
             click.echo(f"  {c}")
         inspector = inspect(db.engine)
         creados = 0
@@ -150,6 +196,58 @@ def registrar_comandos_despliegue(app) -> None:
                     creados += 1
         db.session.commit()
         click.echo(f"Listo: {len(nuevas)} tabla(s) nueva(s), {creados} índice(s) nuevo(s).")
+
+    @app.cli.command("permisos-bd")
+    @click.option("--usuario", default="agrofalma_app", show_default=True, help="Usuario de MySQL con el que correrá la aplicación.")
+    @click.option("--host", default="localhost", show_default=True, help="Desde dónde se conecta (localhost si MySQL está en el mismo servidor).")
+    def permisos_bd(usuario, host):
+        """Imprime el SQL para crear un usuario de MySQL con los permisos MÍNIMOS (no root): puede leer y escribir los datos
+        del sistema, pero no borrar ni modificar la bitácora ni el kárdex, ni crear ni borrar tablas."""
+        import re
+
+        from app.extensions import db
+        from app.models import Bitacora, BitacoraCadena, MovimientoInventario
+
+        for valor, etiqueta in ((usuario, "usuario"), (host, "host")):
+            if not re.fullmatch(r"[A-Za-z0-9_.%-]{1,60}", valor):
+                raise click.ClickException(f"El {etiqueta} solo puede tener letras, números, punto, guion y guion bajo.")
+        base = app.config["DB_NAME"]
+        solo_agregar = {Bitacora.__tablename__, MovimientoInventario.__tablename__}
+        lineas = [
+            f"-- Usuario de la aplicación con permisos mínimos sobre `{base}`. Reemplaza la clave y ejecútalo con un usuario administrador de MySQL.",
+            # sin IF NOT EXISTS a propósito: si el usuario ya existe (con quién sabe qué permisos), MySQL avisa y no se mezcla nada
+            f"CREATE USER '{usuario}'@'{host}' IDENTIFIED BY 'CAMBIAR_ESTA_CLAVE_POR_UNA_LARGA';",
+        ]
+        for tabla in db.metadata.sorted_tables:
+            if tabla.name in solo_agregar:
+                permisos = "SELECT, INSERT"  # registros de solo-agregar: nadie los edita ni los borra, ni siquiera la aplicación
+            elif tabla.name == BitacoraCadena.__tablename__:
+                permisos = "SELECT, INSERT, UPDATE"  # guarda la huella de la última fila: se actualiza, nunca se borra
+            else:
+                permisos = "SELECT, INSERT, UPDATE, DELETE"
+            lineas.append(f"GRANT {permisos} ON `{base}`.`{tabla.name}` TO '{usuario}'@'{host}';")
+        lineas.append("FLUSH PRIVILEGES;")
+        lineas.append("-- Los cambios de estructura (flask preparar-bd) y los respaldos (mysqldump) necesitan permisos mayores:")
+        lineas.append("-- hazlos con otra cuenta de administración (DB_USER y DB_PASSWORD temporales), no con la de la aplicación.")
+        click.echo("\n".join(lineas))
+
+    @app.cli.command("verificar-bitacora")
+    def verificar_bitacora_cmd():
+        """Revisa la cadena de huellas de la bitácora: detecta filas editadas o borradas directamente en la base de datos."""
+        from app.seguridad import verificar_bitacora
+
+        r = verificar_bitacora()
+        click.echo(f"Filas encadenadas verificadas: {r['verificadas']} (registradas en la cadena: {r['total_registrado']})")
+        if r["sin_huella_previas"]:
+            click.echo(f"Filas anteriores a las huellas (no verificables): {r['sin_huella_previas']}")
+        click.echo(f"Huella de la última fila: {r['ultimo_hash']}")
+        if r["ok"]:
+            click.echo("RESULTADO: CORRECTO. La bitácora no fue alterada.")
+            return
+        for problema in r["problemas"]:
+            click.echo(f"  - {problema}", err=True)
+        click.echo("RESULTADO: ALTERADA. Hay filas editadas, borradas o insertadas fuera del sistema.", err=True)
+        raise SystemExit(1)
 
     @app.cli.command("verificar-despliegue")
     def verificar_despliegue():

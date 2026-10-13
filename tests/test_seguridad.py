@@ -80,7 +80,7 @@ def test_un_login_exitoso_reinicia_el_conteo_de_fallos(app, cliente):
     for _ in range(4):
         iniciar_sesion(cliente, "reinicio_t", "mala-clave-123")
     assert iniciar_sesion(cliente, "reinicio_t", CLAVE_TRABAJADOR).status_code == 302
-    cliente.get("/logout")
+    cliente.post("/logout")
     for _ in range(4):
         assert iniciar_sesion(cliente, "reinicio_t", "mala-clave-123").status_code == 401
     # 4 + éxito + 4 no suman 5 seguidos: la cuenta NO debe estar bloqueada
@@ -89,7 +89,7 @@ def test_un_login_exitoso_reinicia_el_conteo_de_fallos(app, cliente):
 
 def test_logout_se_audita_y_cierra_la_sesion(app, admin):
     antes = contar(app, "logout", "admin_t")
-    admin.get("/logout")
+    admin.post("/logout")
     assert contar(app, "logout", "admin_t") == antes + 1
     assert admin.get("/usuarios").status_code == 302  # de vuelta al login
 

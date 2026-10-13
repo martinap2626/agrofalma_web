@@ -12,6 +12,11 @@
     --borde: #e1e4df;
     --rojo: #d64545;
     --ambar: #e0a531;
+    /* variantes oscuras de rojo y ámbar para TEXTO: contraste mínimo 4,5:1 sobre sus fondos claros (WCAG 2.1 AA) */
+    --rojo-texto: #b3261e;
+    --rojo-boton: #c53030;
+    --ambar-texto: #8a5a00;
+    --gris-texto: #6b6f6a;
 }
 
 * { box-sizing: border-box; }
@@ -78,12 +83,19 @@ a { text-decoration: none; color: inherit; }
 }
 .usuario-nombre { color: var(--texto-secundario); }
 .boton-salir {
-    background: var(--rojo);
+    background: var(--rojo-boton);
     color: #fff;
     padding: 5px 12px;
     border-radius: 6px;
     font-size: 12px;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
 }
+.boton-salir:hover { background: #a82727; }
+.formulario-salir { display: inline; margin: 0; }
+.enlace-cuenta { font-size: 12px; color: var(--verde-primario); text-decoration: underline; }
+.enlace-cuenta:hover { color: var(--verde-oscuro); }
 
 .pagina { padding: 28px; }
 
@@ -102,6 +114,10 @@ a { text-decoration: none; color: inherit; }
 .acciones-cabecera { display: flex; gap: 10px; align-items: center; }
 .texto-ayuda { font-size: 13px; color: var(--texto-secundario); margin: -8px 0 12px; max-width: 720px; }
 
+.formulario-busqueda { display: flex; gap: 8px; align-items: center; margin: 0; }
+.formulario-busqueda .buscador { margin: 0; width: auto; min-width: 260px; }
+.icono-servicio-caido { color: var(--verde-primario); }
+.login-ubicacion .icono { vertical-align: -2px; }
 .buscador {
     padding: 8px 14px;
     border: 1px solid var(--borde);
@@ -123,8 +139,9 @@ a { text-decoration: none; color: inherit; }
 
 .grid-kpis { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
 .tarjeta-kpi { flex: 1; min-width: 160px; }
-.tarjeta-kpi .etiqueta-kpi { font-size: 12px; color: var(--texto-secundario); }
-.tarjeta-kpi .etiqueta-kpi small { display: block; opacity: 0.75; }
+.tarjeta-kpi .etiqueta-kpi { font-size: 12px; color: var(--gris-texto); }
+/* sin transparencia: con opacity el gris claro no alcanzaba el contraste mínimo de lectura */
+.tarjeta-kpi .etiqueta-kpi small { display: block; color: var(--gris-texto); }
 .tarjeta-kpi .valor-kpi { font-size: 22px; font-weight: 600; margin-top: 4px; }
 
 .grid-graficos { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
@@ -159,7 +176,7 @@ a { text-decoration: none; color: inherit; }
 .tabla td { padding: 10px 8px; border-bottom: 1px solid var(--borde); }
 .tabla tr:hover td { background: #fafbfa; }
 
-.stock-critico { color: var(--rojo); font-weight: 600; }
+.stock-critico { color: var(--rojo-texto); font-weight: 600; }
 
 .etiqueta {
     font-size: 12px;
@@ -168,9 +185,9 @@ a { text-decoration: none; color: inherit; }
 }
 .etiqueta-activo { background: #e4f3ea; color: var(--verde-primario); }
 .etiqueta-inactivo { background: #f1f1ef; color: var(--texto-secundario); }
-.etiqueta-pendiente { background: #fdf3e0; color: var(--ambar); }
+.etiqueta-pendiente { background: #fdf3e0; color: var(--ambar-texto); }
 .etiqueta-parcial { background: #f1e9fb; color: #6a3fa0; }
-.etiqueta-alerta { background: #fdeceb; color: var(--rojo); }
+.etiqueta-alerta { background: #fdeceb; color: var(--rojo-texto); }
 .etiqueta-credito { background: #eaf1fb; color: #2b5fa8; }
 .etiqueta-contado { background: #f1f1ef; color: var(--texto-secundario); }
 
@@ -206,12 +223,68 @@ a { text-decoration: none; color: inherit; }
 }
 
 .celda-acciones { white-space: nowrap; }
+.celda-acciones > * + * { margin-left: 6px; }
+/* botones de ícono: área de toque de al menos 32 px (WCAG 2.5.8 pide mínimo 24 px y espacio entre ellos) */
 .icono-accion {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    min-height: 32px;
     border: none;
+    border-radius: 6px;
     background: none;
-    font-size: 15px;
+    color: var(--gris-texto);
     cursor: pointer;
-    padding: 2px 6px;
+    padding: 4px;
+    vertical-align: middle;
+}
+.icono-accion:hover { background: #eef0ed; color: var(--texto-principal); }
+.icono-accion .icono { display: block; }
+
+/* texto solo para lectores de pantalla (encabezados de columnas de botones, etiquetas sin texto visible) */
+.solo-lector {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* título de una sección dentro de un formulario que no es la etiqueta de un campo concreto */
+.etiqueta-seccion { font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
+
+/* acción destructiva (eliminar, anular) */
+.boton-peligro {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid var(--rojo-boton);
+    background: #fff;
+    color: var(--rojo-boton);
+    cursor: pointer;
+    font-family: inherit;
+}
+.boton-peligro:hover { background: var(--rojo-boton); color: #fff; }
+.celda-acciones .boton-peligro, .celda-acciones .boton-secundario { padding: 6px 12px; font-size: 13px; }
+
+/* aviso de venta anulada en su detalle */
+.aviso-anulada {
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    background: #fbe7e7;
+    color: #7a1f1f;
+    font-size: 14px;
+    line-height: 1.5;
 }
 
 .sin-resultados { text-align: center; color: var(--texto-secundario); padding: 24px 0 !important; }

@@ -13,7 +13,7 @@ que el dashboard debe poder aislar una sede a la vez, no solo mostrar
 el consolidado.
 """
 
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from flask import Blueprint, render_template, request, flash
@@ -25,11 +25,46 @@ from app.utilidades_fecha import rango_mes
 from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
 from app.extensions import db
 from app.models import (
-    Categoria, Credito, DetalleVenta, EventoNegocio, PrediccionDemanda, Producto, RecomendacionAbastecimiento, Recuperacion,
-    SegmentacionProducto, Sede, StockPorSede, Usuario, Venta,
+    Bitacora, Categoria, Credito, DetalleVenta, EventoNegocio, PrediccionDemanda, Producto, RecomendacionAbastecimiento,
+    Recuperacion, SegmentacionProducto, Sede, StockPorSede, Usuario, Venta,
 )
 
 bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
+
+# a partir de cuántos hechos sospechosos en 24 horas el dashboard muestra una alerta
+UMBRAL_ALERTA_ACCESOS = 5
+
+
+# cuenta en la bitácora lo que el Administrador debe vigilar: accesos fallidos y bloqueos (últimas 24 h) y
+# anulaciones, rebajas de precio y conteos de inventario (últimos 7 días)
+def _resumen_control():
+    ahora = datetime.now()
+
+    def contar(desde):
+        filas = (
+            db.session.query(Bitacora.accion, db.func.count())
+            .filter(Bitacora.fecha_hora > desde).group_by(Bitacora.accion).all()
+        )
+        return dict(filas)
+
+    dia, semana = contar(ahora - timedelta(hours=24)), contar(ahora - timedelta(days=7))
+
+    def suma(conteo, acciones):
+        return sum(conteo.get(a, 0) for a in acciones)
+
+    control = {
+        "accesos_fallidos": suma(dia, ("login_fallido", "login_cuenta_inactiva")),
+        "bloqueos": suma(dia, ("login_bloqueado",)),
+        "denegados": suma(dia, ("acceso_denegado", "csrf_rechazado", "exportacion_limitada")),
+        "anulaciones": suma(semana, ("venta_anulada",)),
+        "rebajas": suma(semana, ("venta_precio_rebajado",)),
+        "conteos": suma(semana, ("inventario_conteo",)),
+    }
+    control["alerta"] = (
+        control["accesos_fallidos"] >= UMBRAL_ALERTA_ACCESOS or control["bloqueos"] > 0
+        or control["denegados"] >= UMBRAL_ALERTA_ACCESOS
+    )
+    return control
 
 
 # arma todos los numeros del dashboard para el mes y la sede que se elijan
@@ -63,7 +98,7 @@ def inicio():
 
         # los totales los suma MySQL (una fila por tipo de venta), no Python sobre miles de filas
         consulta_ventas = db.session.query(Venta.tipo_venta, db.func.sum(Venta.total)).filter(
-            Venta.fecha_hora >= inicio_mes, Venta.fecha_hora < fin_mes,
+            Venta.fecha_hora >= inicio_mes, Venta.fecha_hora < fin_mes, Venta.anulada.is_(False),
         )
         if id_sede:
             consulta_ventas = consulta_ventas.filter(Venta.id_sede == id_sede)
@@ -92,7 +127,7 @@ def inicio():
             .join(Venta, Venta.id_venta == DetalleVenta.id_venta)
             .filter(
                 Venta.fecha_hora >= inicio_mes,
-                Venta.fecha_hora < fin_mes,
+                Venta.fecha_hora < fin_mes, Venta.anulada.is_(False),
             )
         )
         if id_sede:
@@ -104,7 +139,7 @@ def inicio():
             .join(Venta, Venta.id_usuario == Usuario.id_usuario)
             .filter(
                 Venta.fecha_hora >= inicio_mes,
-                Venta.fecha_hora < fin_mes,
+                Venta.fecha_hora < fin_mes, Venta.anulada.is_(False),
             )
         )
         if id_sede:
@@ -150,7 +185,7 @@ def inicio():
             .join(Venta, Venta.id_venta == DetalleVenta.id_venta)
             .filter(
                 Venta.fecha_hora >= inicio_mes,
-                Venta.fecha_hora < fin_mes,
+                Venta.fecha_hora < fin_mes, Venta.anulada.is_(False),
             )
         )
         if id_sede:
@@ -167,6 +202,13 @@ def inicio():
         return render_template(
             "dashboard/inicio.html", sedes=sedes, id_sede=id_sede, anio=anio, mes=mes, **valores_vacios
         ), 503
+
+    # control y seguridad (intentos de acceso fallidos, anulaciones, rebajas de precio...): se omite sin romper el dashboard si falla
+    control = None
+    try:
+        control = _resumen_control()
+    except SQLAlchemyError as error:
+        registrar_error_conexion("cargar el resumen de control del dashboard", error)
 
     # panorama de la analítica (pronóstico, clases ABC, reposición y eventos): se omite sin romper el dashboard si falla
     panorama = None
@@ -193,6 +235,7 @@ def inicio():
 
     return render_template(
         "dashboard/inicio.html",
+        control=control,
         panorama=panorama,
         sedes=sedes,
         id_sede=id_sede,

@@ -4,9 +4,11 @@ from app.extensions import db
 class Venta(db.Model):
     """
     Cabecera de una venta (HU del Sprint 2). Una vez registrada no se edita
-    ni se elimina: es un comprobante, igual que en el mundo real. El detalle
-    de productos vendidos vive en DetalleVenta y, si es al crédito, su
-    seguimiento vive en Credito (relación 1 a 1).
+    ni se elimina: es un comprobante, igual que en el mundo real. Si hubo un
+    error, el Administrador la ANULA (queda marcada, con quién, cuándo y por
+    qué; el stock vuelve al almacén y deja de contar en reportes y analítica),
+    pero la fila nunca desaparece. El detalle de productos vendidos vive en
+    DetalleVenta y, si es al crédito, su seguimiento vive en Credito (1 a 1).
     """
 
     __tablename__ = "ventas"
@@ -16,6 +18,7 @@ class Venta(db.Model):
         db.Index("ix_ventas_fecha", "fecha_hora"),
         db.Index("ix_ventas_usuario_fecha", "id_usuario", "fecha_hora"),
         db.Index("ix_ventas_sede_fecha", "id_sede", "fecha_hora"),
+        db.CheckConstraint("total >= 0", name="ck_ventas_total_no_negativo"),
     )
 
     id_venta = db.Column(db.Integer, primary_key=True)
@@ -28,9 +31,18 @@ class Venta(db.Model):
     estado_pago = db.Column(db.Enum("pagado", "pendiente", name="estado_pago"), nullable=False, default="pagado")
     total = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     observaciones = db.Column(db.String(150))
+    # código único que trae el formulario: si el mismo formulario llega dos veces (doble clic, reintento del
+    # navegador), la segunda vez la base de datos lo rechaza y no se registra una venta repetida
+    token_envio = db.Column(db.String(40), unique=True)
+    # anulación (nunca se borra la venta)
+    anulada = db.Column(db.Boolean, nullable=False, default=False, server_default=db.text("0"))
+    fecha_anulacion = db.Column(db.DateTime)
+    id_usuario_anulacion = db.Column(db.Integer, db.ForeignKey("usuarios.id_usuario"))
+    motivo_anulacion = db.Column(db.String(150))
 
     cliente = db.relationship("Cliente", back_populates="ventas")
-    usuario = db.relationship("Usuario")
+    usuario = db.relationship("Usuario", foreign_keys=[id_usuario])
+    usuario_anulacion = db.relationship("Usuario", foreign_keys=[id_usuario_anulacion])
     sede = db.relationship("Sede")
     detalle = db.relationship("DetalleVenta", back_populates="venta", cascade="all, delete-orphan")
     credito = db.relationship("Credito", back_populates="venta", uselist=False, cascade="all, delete-orphan")

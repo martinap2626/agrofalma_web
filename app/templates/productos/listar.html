@@ -49,14 +49,14 @@
                 {% if current_user.es_administrador %}
                 <td class="celda-acciones">
                     <a href="{{ url_for('productos.editar', id_producto=producto.id_producto) }}"
-                       class="icono-accion" title="Editar">✏️</a>
+                       class="icono-accion" title="Editar" aria-label="Editar {{ producto.nombre_producto }}">{{ icono('editar') }}</a>
                     {% if producto.estado %}
                     <form method="POST"
                           action="{{ url_for('productos.desactivar', id_producto=producto.id_producto) }}"
                           data-confirmar="¿Desactivar {{ producto.nombre_producto }}?"
                           style="display:inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="icono-accion" title="Desactivar">🗑️</button>
+                        <button type="submit" class="icono-accion" title="Desactivar" aria-label="Desactivar {{ producto.nombre_producto }}">{{ icono('papelera') }}</button>
                     </form>
                     {% else %}
                     <form method="POST"
@@ -64,7 +64,7 @@
                           data-confirmar="¿Reactivar {{ producto.nombre_producto }}?"
                           style="display:inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="icono-accion" title="Reactivar">♻️</button>
+                        <button type="submit" class="icono-accion" title="Reactivar" aria-label="Reactivar {{ producto.nombre_producto }}">{{ icono('reactivar') }}</button>
                     </form>
                     {% endif %}
                 </td>

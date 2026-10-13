@@ -77,7 +77,7 @@
                 <th>Tipo</th>
                 <th>Estado de pago</th>
                 <th>Total</th>
-                <th></th>
+                <th><span class="solo-lector">Acciones</span></th>
             </tr>
         </thead>
         <tbody>
@@ -94,13 +94,17 @@
                     </span>
                 </td>
                 <td>
+                    {% if venta.anulada %}
+                    <span class="etiqueta etiqueta-alerta">Anulada</span>
+                    {% else %}
                     <span class="etiqueta {{ 'etiqueta-activo' if venta.estado_pago == 'pagado' else 'etiqueta-pendiente' }}">
                         {{ 'Pagado' if venta.estado_pago == 'pagado' else 'Pendiente' }}
                     </span>
+                    {% endif %}
                 </td>
                 <td><span class="monto">S/ {{ "%.2f"|format(venta.total) }}</span></td>
                 <td class="celda-acciones">
-                    <a href="{{ url_for('ventas.detalle', id_venta=venta.id_venta) }}" class="icono-accion" title="Ver detalle">🔍</a>
+                    <a href="{{ url_for('ventas.detalle', id_venta=venta.id_venta) }}" class="icono-accion" title="Ver detalle" aria-label="Ver detalle de la venta {{ venta.numero_operacion }}">{{ icono('ver') }}</a>
                 </td>
             </tr>
             {% else %}

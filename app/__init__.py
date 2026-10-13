@@ -13,8 +13,12 @@ from flask import Flask
 from flask_wtf.csrf import CSRFError
 from sqlalchemy.exc import SQLAlchemyError
 
+from pathlib import Path
+
 from config import Config
-from app.extensions import db, login_manager, csrf
+from app.extensions import db, login_manager, csrf, migrate
+
+CARPETA_MIGRACIONES = Path(__file__).resolve().parent.parent / "migrations"
 
 
 # arma la app completa: conecta las extensiones, registra los blueprints y define los manejadores de error
@@ -41,6 +45,10 @@ def create_app(config_class=Config):
 
     # --- Extensiones ---------------------------------------------------
     db.init_app(app)
+    # los modelos se importan para que Alembic los vea al comparar con la base de datos
+    from app import models  # noqa: F401
+
+    migrate.init_app(app, db, directory=str(CARPETA_MIGRACIONES))
     login_manager.init_app(app)
     csrf.init_app(app)
 
@@ -55,6 +63,7 @@ def create_app(config_class=Config):
     from app.auditoria import bp as auditoria_bp
     from app.ayuda import bp as ayuda_bp
     from app.eventos import bp as eventos_bp
+    from app.inventario import bp as inventario_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(productos_bp)
@@ -66,11 +75,17 @@ def create_app(config_class=Config):
     app.register_blueprint(auditoria_bp)
     app.register_blueprint(ayuda_bp)
     app.register_blueprint(eventos_bp)
+    app.register_blueprint(inventario_bp)
 
     # --- Cabeceras HTTP de seguridad en todas las respuestas ---------------
     from app.seguridad import aplicar_cabeceras
 
     app.after_request(aplicar_cabeceras)
+
+    # íconos SVG disponibles en todas las plantillas: {{ icono('editar') }}
+    from app.iconos import icono
+
+    app.jinja_env.globals["icono"] = icono
 
     # --- Ruta raíz: redirige al dashboard de cada rol (o al login) --------
     # manda a cada quien a su pantalla segun si esta logueado y su rol
@@ -85,13 +100,35 @@ def create_app(config_class=Config):
             return redirect(destino_inicio(current_user))
         return redirect(url_for("auth.login"))
 
+    # --- Ruta de salud: la consulta un monitor externo (UptimeRobot, el balanceador, un script) ----------
+    # Responde 200 si la aplicación y la base de datos funcionan, y 503 si la base no responde. No pide sesión y no
+    # revela nada interno (ni versiones ni nombres): solo "ok" o "no disponible".
+    @app.route("/salud")
+    def salud():
+        from flask import jsonify
+        from sqlalchemy import text
+
+        try:
+            db.session.execute(text("SELECT 1"))
+            return jsonify(estado="ok"), 200
+        except SQLAlchemyError as error:
+            db.session.rollback()
+            app.logger.error("La ruta de salud no pudo consultar la base de datos: %s", error)
+            return jsonify(estado="no disponible"), 503
+
     # --- user_loader de Flask-Login ---------------------------------------
     from app.models import Usuario
 
     # le dice a flask-login como recuperar el usuario a partir del id guardado en la sesion
     @login_manager.user_loader
     def load_user(id_usuario):
-        return db.session.get(Usuario, int(id_usuario))
+        from flask import session
+
+        usuario = db.session.get(Usuario, int(id_usuario))
+        # si la contraseña cambió desde que se abrió esta sesión, la sesión ya no vale (se pide iniciar sesión de nuevo)
+        if usuario is not None and session.get("sv") != usuario.version_sesion:
+            return None
+        return usuario
 
     # --- Manejadores de error simples (401 / 403) -------------------------
     # si no hay sesion activa, manda al login en vez de mostrar un error feo
@@ -109,6 +146,13 @@ def create_app(config_class=Config):
 
         registrar_accion("acceso_denegado", detalle=f"{request.method} {request.path}", resultado="denegado")
         return render_template("errores/403.html"), 403
+
+    # una acción repetida demasiadas veces (por ejemplo, descargar reportes sin parar) se pausa unos minutos
+    @app.errorhandler(429)
+    def demasiadas_solicitudes(_e):
+        from flask import render_template
+
+        return render_template("errores/429.html"), 429
 
     # ruta que no existe
     @app.errorhandler(404)

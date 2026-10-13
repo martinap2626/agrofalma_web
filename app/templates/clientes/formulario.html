@@ -10,7 +10,7 @@
 </div>
 
 <div class="tarjeta tarjeta-formulario">
-    <form method="POST">
+    <form method="POST" data-una-vez>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {% set v = valores if valores is not none else cliente %}
 
@@ -21,8 +21,12 @@
         <div class="fila-formulario">
             <div>
                 <label for="documento">Documento (opcional)</label>
-                <input type="text" id="documento" name="documento"
-                       value="{{ v.documento if v and v.documento else '' }}" placeholder="DNI / RUC">
+                <input type="text" id="documento" name="documento" maxlength="15" inputmode="text" autocomplete="off"
+                       value="{{ v.documento if v and v.documento else '' }}" placeholder="DNI / RUC"
+                       aria-describedby="ayuda-documento">
+                <p class="texto-ayuda" id="ayuda-documento" style="margin:4px 0 0">
+                    DNI de 8 dígitos, RUC de 11 dígitos, o carnet de extranjería o pasaporte (9 a 12 caracteres).
+                </p>
             </div>
             <div>
                 <label for="telefono">Teléfono (opcional)</label>
@@ -33,7 +37,7 @@
 
         <div class="acciones-formulario">
             <a href="{{ url_for('ventas.listar_clientes') }}" class="boton-secundario">Cancelar</a>
-            <button type="submit" class="boton-primario">Guardar</button>
+            <button type="submit" class="boton-primario" data-texto-enviando="Guardando...">Guardar</button>
         </div>
     </form>
 </div>

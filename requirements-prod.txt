@@ -1,4 +1,7 @@
 -r requirements.txt
 
-# servidor de producción (Windows y Linux). En Linux también puede usarse gunicorn: pip install gunicorn
+# servidor de producción. waitress funciona en Windows y Linux (un solo proceso con varios hilos)
 waitress==3.0.2
+
+# En Linux se prefiere gunicorn: varios procesos (aprovechan todos los núcleos y, si uno falla, los demás siguen atendiendo)
+gunicorn==26.2.0; sys_platform != "win32"

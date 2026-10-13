@@ -3,6 +3,8 @@ from app.extensions import db
 
 class Cliente(db.Model):
     __tablename__ = "clientes"
+    # el documento se busca al crear o editar un cliente (para no duplicarlo)
+    __table_args__ = (db.Index("ix_clientes_documento", "documento"),)
 
     id_cliente = db.Column(db.Integer, primary_key=True)
     nombre_cliente = db.Column(db.String(100), nullable=False)

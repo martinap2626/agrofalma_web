@@ -18,6 +18,8 @@ class StockPorSede(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint("id_producto", "id_sede", name="uk_stock_producto_sede"),
+        # el stock nunca puede quedar negativo, ni siquiera si dos ventas simultáneas compiten por la última unidad
+        db.CheckConstraint("cantidad_actual >= 0", name="ck_stock_no_negativo"),
     )
 
     # solo para que se vea algo legible en consola/logs

@@ -28,11 +28,22 @@
         </div>
         <div>
             <strong>Estado de pago:</strong>
+            {% if venta.anulada %}
+            <span class="etiqueta etiqueta-alerta">Anulada</span>
+            {% else %}
             <span class="etiqueta {{ 'etiqueta-activo' if venta.estado_pago == 'pagado' else 'etiqueta-pendiente' }}">
                 {{ 'Pagado' if venta.estado_pago == 'pagado' else 'Pendiente' }}
             </span>
+            {% endif %}
         </div>
     </div>
+    {% if venta.anulada %}
+    <div class="aviso-anulada" role="note">
+        <strong>Venta anulada</strong> el {{ venta.fecha_anulacion.strftime('%d/%m/%Y %H:%M') if venta.fecha_anulacion else '—' }}
+        por {{ venta.usuario_anulacion.nombre_completo if venta.usuario_anulacion else '—' }}.
+        Motivo: {{ venta.motivo_anulacion or '—' }}. El stock volvió al almacén y esta venta no cuenta en reportes ni en la analítica.
+    </div>
+    {% endif %}
     {% if venta.observaciones %}
     <div><strong>Observaciones:</strong> {{ venta.observaciones }}</div>
     {% endif %}
@@ -73,10 +84,37 @@
     <p>
         Saldo pendiente: <strong><span class="monto">S/ {{ "%.2f"|format(venta.credito.saldo_pendiente) }}</span></strong>
         de <span class="monto">S/ {{ "%.2f"|format(venta.credito.monto_credito) }}</span>
+        {% if venta.credito.estado == 'anulado' %}<span class="etiqueta etiqueta-inactivo">Anulado</span>{% endif %}
     </p>
     <a href="{{ url_for('ventas.detalle_credito', id_credito=venta.credito.id_credito) }}" class="boton-primario">
-        Ver crédito y registrar pagos
+        {% if venta.credito.estado == 'pendiente' %}Ver crédito y registrar pagos{% else %}Ver crédito{% endif %}
     </a>
+</div>
+{% endif %}
+
+{% if current_user.es_administrador and not venta.anulada and not es_historica %}
+<div class="tarjeta" style="margin-top:18px">
+    <h2 style="font-size:16px;margin-top:0">Anular esta venta</h2>
+    <p class="texto-ayuda" style="margin-top:0">
+        Úsalo solo si la venta se registró por error. La venta no se borra: queda marcada como anulada con tu nombre y el motivo,
+        el stock vuelve al almacén y deja de contar en reportes y analítica.
+        {% if venta.credito and venta.credito.recuperaciones %}
+        <strong>Esta venta ya tiene pagos registrados, por eso no se puede anular.</strong>
+        {% endif %}
+    </p>
+    {% if not (venta.credito and venta.credito.recuperaciones) %}
+    <form method="POST" action="{{ url_for('ventas.anular', id_venta=venta.id_venta) }}"
+          data-confirmar="¿Anular la venta {{ venta.numero_operacion }}? Esta acción queda registrada y no se puede deshacer."
+          data-confirmar-boton="Anular venta">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="motivo">Motivo de la anulación</label>
+        <input type="text" id="motivo" name="motivo" minlength="5" maxlength="150" required
+               placeholder="Ej. Se digitó el cliente equivocado">
+        <div class="acciones-formulario">
+            <button type="submit" class="boton-peligro">{{ icono('anular', 16) }} Anular venta</button>
+        </div>
+    </form>
+    {% endif %}
 </div>
 {% endif %}
 {% endblock %}

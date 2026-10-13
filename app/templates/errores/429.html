@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block titulo %}Demasiadas solicitudes{% endblock %}
+{% block contenido %}
+<div class="tarjeta tarjeta-error">
+    <h1>Demasiadas solicitudes</h1>
+    <p>
+        {{ mensaje or "Hiciste esta acción muchas veces en poco tiempo. Por seguridad, el sistema la pausó unos minutos." }}
+    </p>
+    <p class="texto-ayuda">Espera un momento e inténtalo de nuevo. No se perdió ningún dato.</p>
+    <a href="{{ url_for('index') }}" class="boton-primario">Ir al inicio</a>
+</div>
+{% endblock %}

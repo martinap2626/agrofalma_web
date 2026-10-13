@@ -8,7 +8,7 @@ historial de accesos), y la contraseña es opcional al editar: si se deja en
 blanco, se conserva la actual.
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, session, url_for, flash
 from flask_login import login_required, current_user
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
@@ -106,7 +106,7 @@ def nuevo():
 @rol_requerido("Administrador")
 def editar(id_usuario):
     try:
-        usuario = Usuario.query.get_or_404(id_usuario)
+        usuario = db.get_or_404(Usuario, id_usuario)
         roles = Rol.query.filter_by(estado=True).order_by(Rol.nombre_rol).all()
         sedes = Sede.query.filter_by(estado=True).order_by(Sede.nombre_sede).all()
     except SQLAlchemyError as error:
@@ -128,6 +128,9 @@ def editar(id_usuario):
 
             try:
                 db.session.commit()
+                # si el Administrador cambió SU PROPIA contraseña, su sesión actual sigue valida (las demás se cierran)
+                if datos["contrasena"] and usuario.id_usuario == current_user.id_usuario:
+                    session["sv"] = usuario.version_sesion
                 registrar_accion(
                     "usuario_editado", "usuario", usuario.id_usuario,
                     f"{usuario.usuario_login} (rol {usuario.rol.nombre_rol})"
@@ -162,7 +165,7 @@ def desactivar(id_usuario):
         return redirect(url_for("usuarios.listar"))
 
     try:
-        usuario = Usuario.query.get_or_404(id_usuario)
+        usuario = db.get_or_404(Usuario, id_usuario)
         usuario.estado = False
         db.session.commit()
     except SQLAlchemyError as error:
@@ -181,7 +184,7 @@ def desactivar(id_usuario):
 @rol_requerido("Administrador")
 def reactivar(id_usuario):
     try:
-        usuario = Usuario.query.get_or_404(id_usuario)
+        usuario = db.get_or_404(Usuario, id_usuario)
         usuario.estado = True
         db.session.commit()
     except SQLAlchemyError as error:

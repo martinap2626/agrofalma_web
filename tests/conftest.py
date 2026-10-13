@@ -34,6 +34,10 @@ class ConfigPruebas(Config):
     )
     LOGIN_MAX_INTENTOS = 5
     LOGIN_VENTANA_MIN = 15
+    # sin tope de descuento ni de descargas en la base de las pruebas generales (muchas prueban ventas a precios bajos o
+    # descargan varios reportes); las pruebas del control de precios y del límite de descargas fijan sus propios valores
+    DESCUENTO_MAX_TRABAJADOR_PCT = 100.0
+    EXPORT_MAX_POR_VENTANA = 1000
 
 
 class ConfigPruebasConCSRF(ConfigPruebas):
@@ -147,6 +151,41 @@ def trabajador_a(app):
 def trabajador_b(app):
     c = app.test_client()
     assert iniciar_sesion(c, "trab_b", CLAVE_TRABAJADOR).status_code == 302
+    return c
+
+
+# crea una cuenta propia para una prueba (así no se alteran las cuentas compartidas de las demás pruebas)
+def crear_usuario(app, login, clave, rol="Trabajador", estado=True):
+    with app.app_context():
+        rol_fila = Rol.query.filter_by(nombre_rol=rol).first()
+        sede = Sede.query.filter_by(nombre_sede="Chiclayo").first()
+        usuario = Usuario(nombre="Prueba", apellido=login, usuario_login=login, id_rol=rol_fila.id_rol,
+                          id_sede=sede.id_sede, estado=estado)
+        usuario.set_password(clave)
+        db.session.add(usuario)
+        db.session.commit()
+        return usuario.id_usuario
+
+
+# crea un producto propio con su stock en la sede de los trabajadores de prueba; devuelve su id
+def crear_producto(app, codigo, precio=50, stock=100, stock_minimo=0):
+    with app.app_context():
+        categoria = Categoria.query.first()
+        unidad = UnidadMedida.query.first()
+        sede = Sede.query.filter_by(nombre_sede="Chiclayo").first()
+        producto = Producto(codigo_producto=codigo, nombre_producto=f"Producto {codigo}", id_categoria=categoria.id_categoria,
+                            id_unidad=unidad.id_unidad, precio_unitario=precio, stock_minimo=stock_minimo)
+        db.session.add(producto)
+        db.session.flush()
+        db.session.add(StockPorSede(id_producto=producto.id_producto, id_sede=sede.id_sede, cantidad_actual=stock))
+        db.session.commit()
+        return producto.id_producto
+
+
+# cliente HTTP con la sesión ya iniciada
+def sesion_de(app, login, clave):
+    c = app.test_client()
+    assert iniciar_sesion(c, login, clave).status_code == 302
     return c
 
 

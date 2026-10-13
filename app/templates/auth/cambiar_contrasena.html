@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block titulo %}Cambiar contraseña — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Cambiar mi contraseña</h1>
+</div>
+
+<div class="tarjeta tarjeta-formulario">
+    <p class="texto-ayuda" style="margin-top:0">
+        Usa una contraseña de al menos 8 caracteres que combine letras y números. Al cambiarla, se cerrarán las demás
+        sesiones abiertas con tu cuenta (otros equipos o navegadores); esta seguirá abierta.
+    </p>
+    <form method="POST" action="{{ url_for('auth.cambiar_contrasena') }}" data-una-vez>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <label for="contrasena_actual">Contraseña actual</label>
+        {% with id = "contrasena_actual", name = "contrasena_actual", required = true, autocomplete = "current-password" %}
+        {% include "_campo_contrasena.html" %}
+        {% endwith %}
+
+        <label for="contrasena_nueva">Contraseña nueva</label>
+        {% with id = "contrasena_nueva", name = "contrasena_nueva", required = true, autocomplete = "new-password" %}
+        {% include "_campo_contrasena.html" %}
+        {% endwith %}
+
+        <label for="confirmar_contrasena">Repite la contraseña nueva</label>
+        {% with id = "confirmar_contrasena", name = "confirmar_contrasena", required = true, autocomplete = "new-password" %}
+        {% include "_campo_contrasena.html" %}
+        {% endwith %}
+
+        <div class="acciones-formulario">
+            <a href="{{ url_for('index') }}" class="boton-secundario">Cancelar</a>
+            <button type="submit" class="boton-primario" data-texto-enviando="Guardando...">Cambiar contraseña</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block script_pie %}
+<script src="{{ url_for('static', filename='js/ojito-contrasena.js') }}"></script>
+{% endblock %}

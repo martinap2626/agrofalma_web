@@ -1,0 +1,15 @@
+{
+  "name": "agrofalma-auditoria-accesibilidad",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Auditoría de accesibilidad (axe-core y Lighthouse) de las pantallas del sistema Agrofalma",
+  "type": "module",
+  "scripts": {
+    "auditar": "node auditar.mjs"
+  },
+  "dependencies": {
+    "axe-core": "4.14.0",
+    "lighthouse": "13.5.0",
+    "puppeteer-core": "25.13.0"
+  }
+}

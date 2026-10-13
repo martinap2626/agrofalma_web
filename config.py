@@ -65,3 +65,19 @@ class Config:
 
     # --- Registro de errores en archivo -------------------------------------
     LOG_ARCHIVO = os.environ.get("LOG_ARCHIVO", "logs/agrofalma.log")
+
+    # --- Control de precios ---------------------------------------------------
+    # descuento máximo (en %) sobre el precio de lista que un Trabajador puede dar sin autorización; más que eso solo
+    # lo puede hacer el Administrador. Toda venta por debajo del precio de lista queda en la bitácora.
+    DESCUENTO_MAX_TRABAJADOR_PCT = float(os.environ.get("DESCUENTO_MAX_TRABAJADOR_PCT", "10"))
+
+    # --- Límite de exportaciones --------------------------------------------
+    # máximo de reportes CSV que un usuario puede descargar en la ventana de tiempo (frena la copia masiva de datos)
+    EXPORT_MAX_POR_VENTANA = int(os.environ.get("EXPORT_MAX_POR_VENTANA", "10"))
+    EXPORT_VENTANA_MIN = int(os.environ.get("EXPORT_VENTANA_MIN", "10"))
+
+    # --- Respaldos de la base de datos --------------------------------------
+    # clave para cifrar los respaldos (si está vacía, se guardan sin cifrar); y carpeta FUERA del equipo (disco externo,
+    # carpeta sincronizada con la nube, unidad de red) donde se deja una segunda copia de cada respaldo
+    RESPALDO_CLAVE = os.environ.get("RESPALDO_CLAVE", "")
+    RESPALDO_COPIA_DIR = os.environ.get("RESPALDO_COPIA_DIR", "")

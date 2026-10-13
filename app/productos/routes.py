@@ -134,7 +134,7 @@ def nuevo():
 @rol_requerido("Administrador")
 def editar(id_producto):
     try:
-        producto = Producto.query.get_or_404(id_producto)
+        producto = db.get_or_404(Producto, id_producto)
         categorias = Categoria.query.filter_by(estado=True).order_by(Categoria.nombre_categoria).all()
         unidades = UnidadMedida.query.order_by(UnidadMedida.nombre_unidad).all()
     except SQLAlchemyError as error:
@@ -203,7 +203,7 @@ def editar(id_producto):
 @rol_requerido("Administrador")
 def desactivar(id_producto):
     try:
-        producto = Producto.query.get_or_404(id_producto)
+        producto = db.get_or_404(Producto, id_producto)
         producto.estado = False
         db.session.commit()
     except SQLAlchemyError as error:
@@ -225,7 +225,7 @@ def desactivar(id_producto):
 @rol_requerido("Administrador")
 def reactivar(id_producto):
     try:
-        producto = Producto.query.get_or_404(id_producto)
+        producto = db.get_or_404(Producto, id_producto)
         producto.estado = True
         db.session.commit()
     except SQLAlchemyError as error:

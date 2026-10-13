@@ -18,6 +18,10 @@ pruebas_carga/resultados/
 
 # respaldos de la base de datos (RNF-06) -- contienen datos reales, no se versionan
 respaldos/
+
+# auditoría de accesibilidad: dependencias de Node y resultados de cada corrida
+node_modules/
+pruebas_accesibilidad/resultados/
 # registros de la aplicacion y cache de pruebas
 logs/
 .pytest_cache/

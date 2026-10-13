@@ -34,6 +34,12 @@
                     <span>Productos</span>
                 </a>
                 {% if current_user.is_authenticated and current_user.es_administrador %}
+                <a href="{{ url_for('inventario.listar') }}"
+                   class="menu-item {% if request.blueprint == 'inventario' %}activo{% endif %}">
+                    <span>Inventario</span>
+                </a>
+                {% endif %}
+                {% if current_user.is_authenticated and current_user.es_administrador %}
                 <a href="{{ url_for('analitica.recomendaciones') }}"
                    class="menu-item {% if request.blueprint == 'analitica' %}activo{% endif %}">
                     <span>Analítica comercial</span>
@@ -80,7 +86,12 @@
                 <div class="usuario-actual">
                     <span class="usuario-rol">{{ current_user.rol.nombre_rol }}</span>
                     <span class="usuario-nombre">{{ current_user.nombre_completo }}</span>
-                    <a href="{{ url_for('auth.logout') }}" class="boton-salir">Salir</a>
+                    <a href="{{ url_for('auth.cambiar_contrasena') }}" class="enlace-cuenta">Cambiar contraseña</a>
+                    {# cerrar sesión es una acción (POST con token), no un enlace: ninguna otra página puede cerrar la sesión por uno #}
+                    <form method="POST" action="{{ url_for('auth.logout') }}" class="formulario-salir">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="boton-salir">Salir</button>
+                    </form>
                 </div>
                 {% endif %}
             </header>
@@ -101,6 +112,7 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='js/un-solo-envio.js') }}"></script>
     <script src="{{ url_for('static', filename='js/confirmar.js') }}"></script>
     {% block script_pie %}{% endblock %}
 </body>

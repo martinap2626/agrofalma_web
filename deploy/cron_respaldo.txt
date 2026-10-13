@@ -1,5 +1,14 @@
-# Respaldo diario de la base a las 2 AM (Linux). Agregar con: crontab -e
+# Tareas programadas del servidor Linux. Agregar con: crontab -e   (como el usuario "agrofalma")
+#
+# Respaldo diario de la base a las 2 AM: comprimido, cifrado (RESPALDO_CLAVE) y con copia fuera del equipo (RESPALDO_COPIA_DIR).
+# Si la copia externa falla, el comando termina con código 2 y queda anotado en el registro: revisarlo cada semana.
 0 2 * * * cd /opt/agrofalma/agrofalma_web && .venv/bin/flask respaldar-bd >> logs/respaldo.log 2>&1
+#
 # Actualizar la analítica el día 1 de cada mes a las 3 AM (después de cargar las ventas del mes anterior)
 0 3 1 * * cd /opt/agrofalma/agrofalma_web && .venv/bin/flask actualizar-analitica >> logs/analitica.log 2>&1
+#
+# Simulacro semanal (domingo, 4 AM): comprueba que el respaldo SÍ se puede restaurar y que la bitácora no fue alterada.
+# El resultado queda en logs/verificacion.log; "RESULTADO: CORRECTO" es lo esperado.
+0 4 * * 0 cd /opt/agrofalma/agrofalma_web && (.venv/bin/flask verificar-respaldo && .venv/bin/flask verificar-bitacora) >> logs/verificacion.log 2>&1
+#
 # En Windows: ver scripts/programar_respaldo_windows.ps1

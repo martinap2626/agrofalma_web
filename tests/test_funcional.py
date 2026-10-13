@@ -72,7 +72,7 @@ def test_cp02_alta_edicion_y_desactivacion_de_usuario(app, admin, datos):
     assert admin.post(f"/usuarios/{id_usuario}/editar", data=formulario_usuario(datos, nombre="Laura B")).status_code == 302
     assert admin.post(f"/usuarios/{id_usuario}/desactivar").status_code == 302
     with app.app_context():
-        assert Usuario.query.get(id_usuario).estado is False
+        assert db.session.get(Usuario, id_usuario).estado is False
     # y una cuenta desactivada ya no puede entrar
     assert iniciar_sesion(app.test_client(), "lgomez", "ClaveSegura2026").status_code == 403
     assert admin.post(f"/usuarios/{id_usuario}/reactivar").status_code == 302
@@ -97,7 +97,7 @@ def test_cp02_el_administrador_no_puede_desactivarse_a_si_mismo(app, admin):
         id_admin = Usuario.query.filter_by(usuario_login="admin_t").first().id_usuario
     admin.post(f"/usuarios/{id_admin}/desactivar")
     with app.app_context():
-        assert Usuario.query.get(id_admin).estado is True
+        assert db.session.get(Usuario, id_admin).estado is True
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ def test_cp03_alta_y_edicion_de_producto(app, admin, datos):
     r = admin.post(f"/productos/{id_producto}/editar", data=formulario_producto(datos, precio_unitario="15"))
     assert r.status_code == 302
     with app.app_context():
-        assert Producto.query.get(id_producto).precio_unitario == Decimal("15")
+        assert db.session.get(Producto, id_producto).precio_unitario == Decimal("15")
 
 
 @pytest.mark.parametrize("cambios,mensaje", [
@@ -156,7 +156,7 @@ def test_cp04_venta_al_contado_descuenta_stock_y_calcula_total(app, trabajador_a
     r = nueva_venta(trabajador_a, datos, cantidad="3", precio="40")
     assert r.status_code == 302
     with app.app_context():
-        venta = Venta.query.get(id_de(r))
+        venta = db.session.get(Venta, id_de(r))
         assert venta.total == Decimal("120") and venta.estado_pago == "pagado"
         assert venta.numero_operacion.startswith("OP-")
         assert venta.credito is None
@@ -230,7 +230,7 @@ def crear_credito(app, c, datos, cantidad="2", precio="50"):
 
 def estado_credito(app, id_credito):
     with app.app_context():
-        credito = Credito.query.get(id_credito)
+        credito = db.session.get(Credito, id_credito)
         return credito.saldo_pendiente, credito.estado, credito.venta.estado_pago
 
 
@@ -282,7 +282,7 @@ def test_dashboard_suma_exactamente_lo_vendido_en_el_mes(app, admin, trabajador_
     with app.app_context():
         esperado = dict(
             db.session.query(Venta.tipo_venta, db.func.sum(Venta.total))
-            .filter(Venta.fecha_hora >= inicio, Venta.fecha_hora < fin).group_by(Venta.tipo_venta).all()
+            .filter(Venta.fecha_hora >= inicio, Venta.fecha_hora < fin, Venta.anulada.is_(False)).group_by(Venta.tipo_venta).all()
         )
     html = texto(admin.get("/dashboard"))
     assert f"S/ {esperado['contado']:.2f}" in html
@@ -298,8 +298,10 @@ def test_el_reporte_de_ventas_resume_igual_que_el_detalle(app, admin, trabajador
     nueva_venta(trabajador_a, datos, cantidad="2", precio="10")
     html = texto(admin.get("/reportes?tipo=ventas&desde=2020-01-01&hasta=2099-12-31"))
     with app.app_context():
-        total = sum((v.total for v in Venta.query.all()), Decimal("0"))
-        cantidad = Venta.query.count()
+        # las ventas anuladas no cuentan en el reporte, igual que en la pantalla
+        vigentes = Venta.query.filter_by(anulada=False)
+        total = sum((v.total for v in vigentes.all()), Decimal("0"))
+        cantidad = vigentes.count()
     assert f"S/ {total:.2f}" in html and f">{cantidad}<" in html.replace(" ", "").replace("\n", "")
 
 
@@ -322,7 +324,7 @@ def test_la_ayuda_exige_sesion(cliente):
 # Clientes
 # ---------------------------------------------------------------------------
 def test_clientes_alta_validaciones_y_baja_logica(app, trabajador_a):
-    assert trabajador_a.post("/ventas/clientes/nuevo", data={"nombre_cliente": "Agro Sur", "documento": "20123456789"}).status_code == 302
+    assert trabajador_a.post("/ventas/clientes/nuevo", data={"nombre_cliente": "Agro Sur", "documento": "20100130204"}).status_code == 302
     r = trabajador_a.post("/ventas/clientes/nuevo", data={"nombre_cliente": ""})
     assert "obligatorio" in texto(r)
     r = trabajador_a.post("/ventas/clientes/nuevo", data={"nombre_cliente": "x" * 150})
@@ -394,13 +396,12 @@ def test_los_montos_de_dinero_estan_marcados_para_poder_ocultarse(admin, trabaja
 
 
 def test_la_auditoria_se_pagina_de_a_10_registros(app, admin):
-    from app.extensions import db
-    from app.models import Bitacora
+    from app.seguridad import registrar_accion
 
-    with app.app_context():
+    # las filas se agregan por registrar_accion (la única vía legítima), así quedan encadenadas en la bitácora
+    with app.test_request_context():
         for i in range(25):
-            db.session.add(Bitacora(usuario_login="paginacion_t", accion="logout", resultado="exito", detalle=f"fila {i}"))
-        db.session.commit()
+            registrar_accion("logout", usuario_login="paginacion_t", detalle=f"fila {i}")
     html = texto(admin.get("/auditoria?usuario=paginacion_t"))
     assert html.count("<tr>") - 1 == 10                     # 10 filas (menos la cabecera)
     assert "Página 1 de 3" in html
@@ -425,7 +426,7 @@ def test_el_csv_neutraliza_textos_que_excel_leeria_como_formula(valor, esperado)
 def test_la_exportacion_no_deja_pasar_formulas_en_el_nombre_del_cliente(app, admin, trabajador_a, datos):
     assert nueva_venta(trabajador_a, datos).status_code == 302
     with app.app_context():
-        cliente = Cliente.query.get(datos["cliente"])
+        cliente = db.session.get(Cliente, datos["cliente"])
         original = cliente.nombre_cliente
         cliente.nombre_cliente = "=HYPERLINK(\"http://malo\")"
         db.session.commit()
@@ -434,5 +435,5 @@ def test_la_exportacion_no_deja_pasar_formulas_en_el_nombre_del_cliente(app, adm
         assert "'=HYPERLINK" in csv and ";=HYPERLINK" not in csv
     finally:
         with app.app_context():
-            Cliente.query.get(datos["cliente"]).nombre_cliente = original
+            db.session.get(Cliente, datos["cliente"]).nombre_cliente = original
             db.session.commit()

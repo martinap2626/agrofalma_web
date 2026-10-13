@@ -27,7 +27,7 @@
                 <th>Monto</th>
                 <th>Saldo pendiente</th>
                 <th>Estado</th>
-                <th></th>
+                <th><span class="solo-lector">Acciones</span></th>
             </tr>
         </thead>
         <tbody>
@@ -39,7 +39,9 @@
                 <td><span class="monto">S/ {{ "%.2f"|format(credito.monto_credito) }}</span></td>
                 <td><span class="monto">S/ {{ "%.2f"|format(credito.saldo_pendiente) }}</span></td>
                 <td>
-                    {% if credito.estado_visual == 'pagado' %}
+                    {% if credito.estado_visual == 'anulado' %}
+                    <span class="etiqueta etiqueta-inactivo">Anulado</span>
+                    {% elif credito.estado_visual == 'pagado' %}
                     <span class="etiqueta etiqueta-activo">Pagado</span>
                     {% elif credito.estado_visual == 'parcial' %}
                     <span class="etiqueta etiqueta-parcial">Parcial</span>
@@ -49,7 +51,7 @@
                 </td>
                 <td class="celda-acciones">
                     <a href="{{ url_for('ventas.detalle_credito', id_credito=credito.id_credito) }}"
-                       class="icono-accion" title="Ver">🔍</a>
+                       class="icono-accion" title="Ver crédito" aria-label="Ver crédito de la venta {{ credito.venta.numero_operacion }}">{{ icono('ver') }}</a>
                 </td>
             </tr>
             {% else %}

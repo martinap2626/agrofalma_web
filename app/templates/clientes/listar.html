@@ -8,14 +8,19 @@
 <div class="cabecera-pagina">
     <h1>Clientes</h1>
     <div class="acciones-cabecera">
-        <input type="text" id="buscador" class="buscador" data-buscador="tabla-clientes"
-               placeholder="Buscar cliente..." value="{{ busqueda }}"
-               aria-label="Buscar cliente por nombre">
+        {# la búsqueda la hace el servidor (así funciona igual con 30 o con 30 000 clientes) #}
+        <form method="GET" action="{{ url_for('ventas.listar_clientes') }}" class="formulario-busqueda" role="search">
+            <input type="search" id="buscador" name="q" class="buscador"
+                   placeholder="Buscar por nombre o documento..." value="{{ busqueda }}"
+                   aria-label="Buscar cliente por nombre o documento">
+            <button type="submit" class="boton-secundario">Buscar</button>
+        </form>
         <a href="{{ url_for('ventas.nuevo_cliente') }}" class="boton-primario">+ Nuevo cliente</a>
     </div>
 </div>
 
 <div class="tarjeta">
+    <p class="texto-ayuda" style="margin-top:0">{{ total }} cliente(s){% if busqueda %} para «{{ busqueda }}»{% endif %}.</p>
     <table class="tabla" id="tabla-clientes">
         <thead>
             <tr>
@@ -28,7 +33,7 @@
         </thead>
         <tbody>
             {% for cliente in clientes %}
-            <tr data-filtro="{{ cliente.nombre_cliente|lower }}">
+            <tr>
                 <td>{{ cliente.nombre_cliente }}</td>
                 <td>{{ cliente.documento or '—' }}</td>
                 <td>{{ cliente.telefono or '—' }}</td>
@@ -41,18 +46,18 @@
                 </td>
                 <td class="celda-acciones">
                     <a href="{{ url_for('ventas.editar_cliente', id_cliente=cliente.id_cliente) }}"
-                       class="icono-accion" title="Editar">✏️</a>
+                       class="icono-accion" title="Editar" aria-label="Editar {{ cliente.nombre_cliente }}">{{ icono('editar') }}</a>
                     {% if cliente.estado %}
                     <form method="POST" action="{{ url_for('ventas.desactivar_cliente', id_cliente=cliente.id_cliente) }}"
                           data-confirmar="¿Desactivar {{ cliente.nombre_cliente }}?" style="display:inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="icono-accion" title="Desactivar">🗑️</button>
+                        <button type="submit" class="icono-accion" title="Desactivar" aria-label="Desactivar {{ cliente.nombre_cliente }}">{{ icono('papelera') }}</button>
                     </form>
                     {% else %}
                     <form method="POST" action="{{ url_for('ventas.reactivar_cliente', id_cliente=cliente.id_cliente) }}"
                           data-confirmar="¿Reactivar {{ cliente.nombre_cliente }}?" style="display:inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="icono-accion" title="Reactivar">♻️</button>
+                        <button type="submit" class="icono-accion" title="Reactivar" aria-label="Reactivar {{ cliente.nombre_cliente }}">{{ icono('reactivar') }}</button>
                     </form>
                     {% endif %}
                 </td>
@@ -64,9 +69,8 @@
             {% endfor %}
         </tbody>
     </table>
+    {% set endpoint = 'ventas.listar_clientes' %}
+    {% set parametros = {'q': busqueda} if busqueda else {} %}
+    {% include "_paginacion_servidor.html" %}
 </div>
-{% endblock %}
-
-{% block script_pie %}
-<script src="{{ url_for('static', filename='js/buscador.js') }}"></script>
 {% endblock %}

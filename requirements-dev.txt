@@ -2,3 +2,6 @@
 
 # pruebas automatizadas:  python -m pytest tests -v
 pytest==9.1.1
+
+# auditoria de vulnerabilidades en las dependencias:  pip-audit -r requirements.txt
+pip-audit==2.10.1

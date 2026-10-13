@@ -9,6 +9,7 @@ class DetalleVenta(db.Model):
     """
 
     __tablename__ = "detalle_ventas"
+    __table_args__ = (db.CheckConstraint("cantidad > 0", name="ck_detalle_cantidad_positiva"),)
 
     id_detalle = db.Column(db.Integer, primary_key=True)
     id_venta = db.Column(db.Integer, db.ForeignKey("ventas.id_venta"), nullable=False)

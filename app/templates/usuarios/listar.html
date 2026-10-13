@@ -42,19 +42,19 @@
                 </td>
                 <td class="celda-acciones">
                     <a href="{{ url_for('usuarios.editar', id_usuario=usuario.id_usuario) }}"
-                       class="icono-accion" title="Editar">✏️</a>
+                       class="icono-accion" title="Editar" aria-label="Editar a {{ usuario.nombre_completo }}">{{ icono('editar') }}</a>
                     {% if usuario.id_usuario != current_user.id_usuario %}
                         {% if usuario.estado %}
                         <form method="POST" action="{{ url_for('usuarios.desactivar', id_usuario=usuario.id_usuario) }}"
                               data-confirmar="¿Desactivar a {{ usuario.nombre_completo }}?" style="display:inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="icono-accion" title="Desactivar">🗑️</button>
+                            <button type="submit" class="icono-accion" title="Desactivar" aria-label="Desactivar a {{ usuario.nombre_completo }}">{{ icono('papelera') }}</button>
                         </form>
                         {% else %}
                         <form method="POST" action="{{ url_for('usuarios.reactivar', id_usuario=usuario.id_usuario) }}"
                               data-confirmar="¿Reactivar a {{ usuario.nombre_completo }}?" style="display:inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="icono-accion" title="Reactivar">♻️</button>
+                            <button type="submit" class="icono-accion" title="Reactivar" aria-label="Reactivar a {{ usuario.nombre_completo }}">{{ icono('reactivar') }}</button>
                         </form>
                         {% endif %}
                     {% endif %}

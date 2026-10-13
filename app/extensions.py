@@ -8,9 +8,14 @@ Se vinculan a la app real dentro de create_app() (ver app/__init__.py).
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
+from flask_migrate import Migrate
 from flask_wtf import CSRFProtect
 
 db = SQLAlchemy()
+
+# migraciones formales del esquema (Alembic): cada cambio de la base queda en un archivo de la carpeta migrations/,
+# con su subida y su bajada, en vez de comandos a medida (ver migrations/README.md)
+migrate = Migrate()
 
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"

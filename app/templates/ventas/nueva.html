@@ -11,8 +11,10 @@
 
 <div class="tarjeta">
     {% set v = valores if valores is not none else {} %}
-    <form method="POST">
+    <form method="POST" data-una-vez>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {# código único de este formulario: si llega dos veces (doble clic) el servidor registra una sola venta #}
+        <input type="hidden" name="token_envio" value="{{ token_envio }}">
         <div class="fila-formulario">
             <div>
                 <label for="id_cliente">Cliente</label>
@@ -38,21 +40,21 @@
         <label for="observaciones">Observaciones (opcional)</label>
         <textarea id="observaciones" name="observaciones" rows="2">{{ v.get('observaciones', '') }}</textarea>
 
-        <label>Productos</label>
-        <table class="tabla tabla-lineas" id="tabla-lineas-venta">
+        <p class="etiqueta-seccion" id="titulo-productos">Productos</p>
+        <table class="tabla tabla-lineas" id="tabla-lineas-venta" aria-labelledby="titulo-productos">
             <thead>
                 <tr>
                     <th>Producto</th>
                     <th style="width:100px">Cantidad</th>
                     <th style="width:130px">Precio unit. (S/)</th>
                     <th style="width:110px">Subtotal</th>
-                    <th></th>
+                    <th><span class="solo-lector">Quitar línea</span></th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
                     <td>
-                        <select name="id_producto[]" required>
+                        <select name="id_producto[]" aria-label="Producto" required>
                             <option value="">Seleccione...</option>
                             {% for p in productos %}
                             <option value="{{ p.id_producto }}" data-precio="{{ p.precio_unitario }}">
@@ -61,8 +63,8 @@
                             {% endfor %}
                         </select>
                     </td>
-                    <td><input type="number" name="cantidad[]" min="1" value="1" required></td>
-                    <td><input type="number" name="precio_unitario[]" class="monto" min="0" step="0.01"></td>
+                    <td><input type="number" name="cantidad[]" aria-label="Cantidad" min="1" value="1" required></td>
+                    <td><input type="number" name="precio_unitario[]" aria-label="Precio unitario en soles" class="monto" min="0" step="0.01"></td>
                     <td class="subtotal-linea monto">S/ 0.00</td>
                     <td><button type="button" class="boton-secundario boton-quitar-linea">Quitar</button></td>
                 </tr>
@@ -72,7 +74,7 @@
         <template id="plantilla-linea-venta">
             <tr>
                 <td>
-                    <select name="id_producto[]" required>
+                    <select name="id_producto[]" aria-label="Producto" required>
                         <option value="">Seleccione...</option>
                         {% for p in productos %}
                         <option value="{{ p.id_producto }}" data-precio="{{ p.precio_unitario }}">
@@ -81,8 +83,8 @@
                         {% endfor %}
                     </select>
                 </td>
-                <td><input type="number" name="cantidad[]" min="1" value="1" required></td>
-                <td><input type="number" name="precio_unitario[]" class="monto" min="0" step="0.01"></td>
+                <td><input type="number" name="cantidad[]" aria-label="Cantidad" min="1" value="1" required></td>
+                <td><input type="number" name="precio_unitario[]" aria-label="Precio unitario en soles" class="monto" min="0" step="0.01"></td>
                 <td class="subtotal-linea monto">S/ 0.00</td>
                 <td><button type="button" class="boton-secundario boton-quitar-linea">Quitar</button></td>
             </tr>
@@ -90,11 +92,11 @@
 
         <button type="button" id="boton-agregar-linea" class="boton-secundario" style="margin-top:10px">+ Agregar línea</button>
 
-        <div id="total-venta" class="total-venta monto">Total: S/ 0.00</div>
+        <div id="total-venta" class="total-venta monto" aria-live="polite">Total: S/ 0.00</div>
 
         <div class="acciones-formulario">
             <a href="{{ url_for('ventas.listar') if current_user.es_administrador else url_for('ventas.mis_ventas') }}" class="boton-secundario">Cancelar</a>
-            <button type="submit" class="boton-primario">Registrar venta</button>
+            <button type="submit" class="boton-primario" data-texto-enviando="Registrando...">Registrar venta</button>
         </div>
     </form>
 </div>

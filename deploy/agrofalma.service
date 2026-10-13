@@ -1,16 +1,33 @@
 # Servicio de systemd (Linux). Copiar a /etc/systemd/system/agrofalma.service, ajustar rutas y ejecutar:
 #   sudo systemctl daemon-reload && sudo systemctl enable --now agrofalma
+# Si el sistema se cae por cualquier motivo, systemd lo levanta de nuevo a los 5 segundos (Restart=always).
+# NOTA: no se pudo probar en el equipo de desarrollo (Windows). Verificar en el servidor: systemctl status agrofalma y flask verificar-despliegue.
 [Unit]
 Description=Agrofalma - sistema inteligente de apoyo a decisiones comerciales
 After=network.target mysql.service
+Wants=mysql.service
 
 [Service]
 User=agrofalma
+Group=agrofalma
 WorkingDirectory=/opt/agrofalma/agrofalma_web
-ExecStart=/opt/agrofalma/agrofalma_web/.venv/bin/python servir.py
-Environment=HOST=127.0.0.1 PORT=8000 HILOS=8
-Restart=on-failure
+ExecStart=/opt/agrofalma/agrofalma_web/.venv/bin/gunicorn -c deploy/gunicorn.conf.py wsgi:app
+Restart=always
 RestartSec=5
+# no reiniciar sin fin si el arranque falla siempre (por ejemplo, un .env mal escrito): 5 intentos en 2 minutos y se detiene
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+# Endurecimiento: aunque alguien lograra ejecutar código dentro de la aplicación, el proceso no puede
+# escalar privilegios, ver otras carpetas del servidor ni escribir fuera de logs/.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=/opt/agrofalma/agrofalma_web/logs
 
 [Install]
 WantedBy=multi-user.target

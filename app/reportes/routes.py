@@ -16,15 +16,15 @@ import io
 from datetime import date
 from decimal import Decimal
 
-from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask import Blueprint, Response, abort, current_app, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.decorators import rol_requerido
 from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
 from app.extensions import db
 from app.models import Categoria, DetalleVenta, Producto, Sede, Venta
-from app.seguridad import registrar_accion
+from app.seguridad import acciones_recientes, registrar_accion
 from app.utilidades_fecha import rango_fechas
 
 bp = Blueprint("reportes", __name__, url_prefix="/reportes")
@@ -68,6 +68,19 @@ def _texto_seguro(valor):
 @login_required
 @rol_requerido("Administrador")
 def exportar():
+    # tope de descargas por usuario: frena que una cuenta (o una sesión robada) copie los datos del negocio en masa
+    try:
+        if acciones_recientes(
+            "reporte_exportado", current_user.id_usuario, current_app.config["EXPORT_VENTANA_MIN"]
+        ) >= current_app.config["EXPORT_MAX_POR_VENTANA"]:
+            registrar_accion("exportacion_limitada", "reporte", request.args.get("tipo", "ventas"),
+                             "Se superó el máximo de descargas por ventana de tiempo", resultado="denegado")
+            abort(429)
+    except SQLAlchemyError as error:
+        registrar_error_conexion("revisar el límite de exportaciones", error)
+        flash(MENSAJE_ERROR_CONEXION, "danger")
+        return redirect(url_for("reportes.inicio"))
+
     tipo, desde, hasta, id_sede = _leer_filtros(request.args)
     salida = io.StringIO()
     # ';' en vez de ',': en configuraciones regionales en español, Excel
@@ -146,7 +159,7 @@ def _leer_filtros(args):
 # arma el listado y el resumen de ventas para el rango de fechas pedido
 def _reporte_ventas(desde, hasta, id_sede):
     inicio, fin = rango_fechas(desde, hasta)
-    filtro = [Venta.fecha_hora >= inicio, Venta.fecha_hora < fin]
+    filtro = [Venta.fecha_hora >= inicio, Venta.fecha_hora < fin, Venta.anulada.is_(False)]
     if id_sede:
         filtro.append(Venta.id_sede == id_sede)
 
@@ -181,7 +194,8 @@ def _reporte_productos(desde, hasta, id_sede):
         .join(DetalleVenta, DetalleVenta.id_producto == Producto.id_producto)
         .join(Categoria, Categoria.id_categoria == Producto.id_categoria)
         .join(Venta, Venta.id_venta == DetalleVenta.id_venta)
-        .filter(Venta.fecha_hora >= rango_fechas(desde, hasta)[0], Venta.fecha_hora < rango_fechas(desde, hasta)[1])
+        .filter(Venta.fecha_hora >= rango_fechas(desde, hasta)[0], Venta.fecha_hora < rango_fechas(desde, hasta)[1],
+                Venta.anulada.is_(False))
     )
     if id_sede:
         consulta = consulta.filter(Venta.id_sede == id_sede)

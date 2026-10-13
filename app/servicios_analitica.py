@@ -84,12 +84,27 @@ def asegurar_esquema() -> list[str]:
             db.session.execute(text(f"ALTER TABLE recomendaciones_abastecimiento ADD COLUMN {nombre} {ddl}"))
             cambios.append(f"columna recomendaciones_abastecimiento.{nombre}")
     if db.engine.dialect.name == "mysql":
-        db.session.execute(text("ALTER TABLE recomendaciones_abastecimiento MODIFY stock_actual INT NULL"))
-        db.session.execute(text(
-            "ALTER TABLE recomendaciones_abastecimiento MODIFY nivel_urgencia "
-            "ENUM('urgente','media','sin_accion','plan') NOT NULL"
-        ))
-        db.session.execute(text("ALTER TABLE recomendaciones_abastecimiento MODIFY motivo VARCHAR(400) NULL"))
+        # solo se altera lo que de verdad falta: así, con la estructura al día, esta función no ejecuta ningún cambio de
+        # estructura y la actualización mensual de la analítica puede correr con el usuario de MySQL de permisos mínimos
+        tipos = {
+            f[0]: str(f[1]).lower() for f in db.session.execute(text(
+                "SELECT column_name, column_type FROM information_schema.columns "
+                "WHERE table_schema = DATABASE() AND table_name = 'recomendaciones_abastecimiento'"
+            )).all()
+        }
+        columnas_rec = {c["name"]: c for c in inspect(db.engine).get_columns("recomendaciones_abastecimiento")}
+        if not columnas_rec["stock_actual"]["nullable"]:
+            db.session.execute(text("ALTER TABLE recomendaciones_abastecimiento MODIFY stock_actual INT NULL"))
+            cambios.append("recomendaciones_abastecimiento.stock_actual acepta vacío")
+        if "'plan'" not in tipos.get("nivel_urgencia", ""):
+            db.session.execute(text(
+                "ALTER TABLE recomendaciones_abastecimiento MODIFY nivel_urgencia "
+                "ENUM('urgente','media','sin_accion','plan') NOT NULL"
+            ))
+            cambios.append("recomendaciones_abastecimiento.nivel_urgencia acepta 'plan'")
+        if tipos.get("motivo") != "varchar(400)":
+            db.session.execute(text("ALTER TABLE recomendaciones_abastecimiento MODIFY motivo VARCHAR(400) NULL"))
+            cambios.append("recomendaciones_abastecimiento.motivo de 400 caracteres")
     db.session.commit()
     return cambios
 
@@ -400,7 +415,7 @@ def ventas_sistema_mensual() -> pd.DataFrame:
         .join(DetalleVenta, DetalleVenta.id_producto == Producto.id_producto)
         .join(Venta, Venta.id_venta == DetalleVenta.id_venta)
         .join(Categoria, Categoria.id_categoria == Producto.id_categoria)
-        .filter(Venta.fecha_hora >= inicio, Venta.fecha_hora < fin, ~Venta.numero_operacion.like("H%"))
+        .filter(Venta.fecha_hora >= inicio, Venta.fecha_hora < fin, ~Venta.numero_operacion.like("H%"), Venta.anulada.is_(False))
         .group_by(Producto.nombre_producto, db.extract("year", Venta.fecha_hora), db.extract("month", Venta.fecha_hora), Categoria.nombre_categoria)
         .all()
     )

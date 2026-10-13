@@ -25,6 +25,7 @@
     <a href="#dashboard">Dashboard</a>
     <a href="#consolidado">Ventas consolidadas</a>
     <a href="#catalogo">Productos</a>
+    <a href="#inventario">Inventario</a>
     <a href="#analitica">Analítica comercial</a>
     <a href="#reportes">Reportes</a>
     <a href="#usuarios">Usuarios</a>
@@ -41,6 +42,7 @@
         <li>Escribe tu <strong>usuario</strong> y tu <strong>contraseña</strong> en la pantalla de inicio de sesión y pulsa <em>Ingresar</em>. El ícono del ojo permite ver lo que escribes.</li>
         <li>El menú de la izquierda muestra solo lo que tu rol puede usar. {% if es_admin %}Como Administrador ves todos los módulos.{% else %}Como Trabajador ves tus ventas, el catálogo de productos, los clientes y tus créditos.{% endif %}</li>
         <li>Al terminar, pulsa <em>Salir</em> (arriba a la derecha). Si dejas el sistema sin usar durante 30 minutos, se cierra la sesión solo, para proteger la información.</li>
+        <li>Para cambiar tu contraseña, pulsa <em>Cambiar contraseña</em> (arriba a la derecha): te pide la actual y la nueva. Al cambiarla, se cierran las demás sesiones abiertas con tu cuenta, por si alguien más la estaba usando.</li>
     </ol>
     <p class="texto-ayuda">
         Por seguridad, tras 5 intentos fallidos de contraseña la cuenta se bloquea unos minutos. Si pasa, espera
@@ -56,9 +58,13 @@
         <li>Elige el <strong>cliente</strong>. Si no existe, créalo antes en la pestaña <em>Clientes</em>.</li>
         <li>Elige el <strong>tipo de venta</strong>: <em>Contado</em> (el cliente paga ahora) o <em>Crédito</em> (pagará después).</li>
         <li>En <em>Productos</em>, selecciona el producto y la cantidad. Pulsa <em>+ Agregar línea</em> para sumar más productos y <em>Quitar</em> para borrar una línea. El total se calcula solo.</li>
-        <li>Pulsa <em>Registrar venta</em>. El sistema descuenta el stock de tu sede automáticamente.</li>
+        <li>Pulsa <em>Registrar venta</em> una sola vez: el botón cambia a <em>Registrando...</em> mientras se guarda. El sistema descuenta el stock de tu sede automáticamente.</li>
     </ol>
-    <p class="texto-ayuda">Una venta registrada no se puede editar ni borrar, porque funciona como comprobante. Si te equivocas, avisa al administrador.</p>
+    <p class="texto-ayuda">
+        Puedes cambiar el precio de un producto, pero solo hasta cierto descuento sobre el precio de lista; si te pasas, el sistema te lo avisa y
+        necesitas la autorización del administrador. Toda rebaja queda registrada.
+    </p>
+    <p class="texto-ayuda">Una venta registrada no se puede editar ni borrar, porque funciona como comprobante. Si te equivocas, avisa al administrador: él puede <strong>anularla</strong> (queda registrada como anulada y el stock vuelve al almacén) y tú registras la correcta.</p>
 </section>
 
 <section class="tarjeta ayuda-seccion" id="creditos">
@@ -73,7 +79,7 @@
 
 <section class="tarjeta ayuda-seccion" id="clientes">
     <h2>Clientes</h2>
-    <p>En la pestaña <em>Clientes</em> puedes buscar, crear y editar clientes. Solo el nombre es obligatorio. Un cliente desactivado ya no aparece al registrar ventas, pero su historial se conserva.</p>
+    <p>En la pestaña <em>Clientes</em> puedes buscar, crear y editar clientes. Solo el nombre es obligatorio. El documento, si lo escribes, debe ser un DNI (8 dígitos), un RUC (11 dígitos) o un carnet de extranjería o pasaporte (9 a 12 caracteres); el sistema avisa si ya existe otro cliente con el mismo documento. La búsqueda mira el nombre y el documento. Un cliente desactivado ya no aparece al registrar ventas, pero su historial se conserva.</p>
 </section>
 
 <section class="tarjeta ayuda-seccion" id="mis-ventas">
@@ -98,7 +104,7 @@
     <h2>Ventas consolidadas</h2>
     <p>
         Lista las ventas de todas las sedes. Por defecto muestra los últimos 30 días; cambia <em>Desde</em> y <em>Hasta</em>,
-        o filtra por trabajador, categoría y sede, y pulsa <em>Filtrar</em>. La lupa abre el detalle de cada venta.
+        o filtra por trabajador, categoría y sede, y pulsa <em>Filtrar</em>. La lupa abre el detalle de cada venta; allí puedes <strong>anularla</strong> si se registró por error (escribes el motivo; el stock vuelve al almacén y la venta deja de contar en reportes y analítica, pero queda a la vista con la etiqueta <em>Anulada</em>). No se puede anular una venta al crédito que ya tiene pagos.
         Cuando hay más de {{ 500 }} resultados, se muestran los más recientes: acota las fechas para ver el resto.
     </p>
 </section>
@@ -109,6 +115,19 @@
         Crea, edita, desactiva y reactiva productos. El <strong>stock mínimo</strong> es el nivel por debajo del cual el sistema
         avisa que hay que reponer. Un producto desactivado no se puede vender, pero su historial se conserva.
     </p>
+</section>
+
+<section class="tarjeta ayuda-seccion" id="inventario">
+    <h2>Inventario</h2>
+    <p>
+        Muestra cuánto hay de cada producto en cada sede. Elige la sede, busca el producto y pulsa <em>Movimientos</em>.
+    </p>
+    <ul>
+        <li><strong>Registrar un ingreso:</strong> suma unidades al stock cuando llega mercadería comprada, sale producción propia o un cliente devuelve algo. Elige la sede, la cantidad y el motivo.</li>
+        <li><strong>Registrar un conteo físico:</strong> fija el stock en lo que contaste en el almacén. La diferencia con lo que decía el sistema queda registrada, y ese producto pasa de «Estimado» a «Conteo real».</li>
+        <li><strong>Historial (kárdex):</strong> cada venta, anulación, ingreso o conteo deja un movimiento con quién lo hizo, cuándo, cuánto y cuánto quedó. Nunca se edita ni se borra.</li>
+    </ul>
+    <p class="texto-ayuda">Mantener el inventario al día mejora las recomendaciones de reposición: son tan buenas como el stock registrado.</p>
 </section>
 
 <section class="tarjeta ayuda-seccion" id="analitica">
@@ -159,7 +178,7 @@
     <p>
         Registra quién hizo qué y cuándo: inicios de sesión, intentos fallidos, ventas, pagos, cambios en productos y usuarios, y
         accesos denegados. Filtra por fecha, usuario, acción o resultado. Es de solo lectura: nadie puede editar ni borrar estos registros.
-        Si ves muchos <em>intentos de acceso fallidos</em> de una misma cuenta o dirección, alguien podría estar probando contraseñas.
+        Si ves muchos <em>intentos de acceso fallidos</em> de una misma cuenta o dirección, alguien podría estar probando contraseñas. El botón <em>Verificar integridad</em> comprueba que nadie haya editado ni borrado registros directamente en la base de datos. El <em>Dashboard</em> resume lo que conviene vigilar (accesos fallidos, anulaciones y rebajas de precio).
     </p>
 </section>
 {% endif %}
@@ -201,7 +220,23 @@
     </details>
     <details>
         <summary>Escribí mal una venta, ¿puedo corregirla?</summary>
-        <p>No. Las ventas son comprobantes y no se editan ni se borran. Avisa al administrador para que decida cómo regularizarla.</p>
+        <p>Una venta no se edita, pero el administrador puede <strong>anularla</strong> (queda marcada como anulada, con el motivo, y el stock vuelve al almacén). Después registras la venta correcta. Las ventas antiguas importadas como resumen mensual no se pueden anular.</p>
+    </details>
+    <details>
+        <summary>Me dice que el precio está por debajo del precio de lista</summary>
+        <p>Un Trabajador puede dar un descuento limitado sobre el precio de lista. Si el descuento es mayor, pide al administrador que registre la venta o que te autorice. Las ventas con precio rebajado quedan anotadas en la auditoría.</p>
+    </details>
+    <details>
+        <summary>Me dice «Esa venta ya estaba registrada»</summary>
+        <p>El formulario se envió dos veces (por ejemplo, con doble clic). El sistema guardó una sola venta y te lleva a ella; no hace falta repetir nada.</p>
+    </details>
+    <details>
+        <summary>Cambié mi contraseña y se cerró mi sesión en otro equipo</summary>
+        <p>Es a propósito: al cambiar la contraseña se cierran las demás sesiones abiertas con tu cuenta, por si alguien más la estaba usando. En el equipo donde la cambiaste sigues dentro.</p>
+    </details>
+    <details>
+        <summary>Me dice «Demasiadas solicitudes»</summary>
+        <p>Hiciste la misma acción muchas veces en poco tiempo (por ejemplo, descargar reportes sin parar). Espera unos minutos; no se perdió nada.</p>
     </details>
 </section>
 
@@ -212,6 +247,10 @@
         <dd>Cantidad por debajo de la cual el producto se considera en nivel bajo y conviene reponerlo.</dd>
         <dt>Crédito / Saldo pendiente</dt>
         <dd>Venta que el cliente pagará después. El saldo pendiente es lo que aún debe.</dd>
+        <dt>Anulación de una venta</dt>
+        <dd>Forma de corregir una venta registrada por error: la venta no se borra, queda marcada como anulada con quién, cuándo y por qué, el stock vuelve al almacén y deja de contar en reportes y analítica.</dd>
+        <dt>Kárdex</dt>
+        <dd>Historial de movimientos de un producto: cada venta, anulación, ingreso o conteo, con la fecha, la cantidad, el motivo y quién lo hizo.</dd>
         <dt>Cobro (recuperación)</dt>
         <dd>Pago que el cliente hace sobre un crédito.</dd>
         <dt>Clase A, B y C (segmentación ABC)</dt>

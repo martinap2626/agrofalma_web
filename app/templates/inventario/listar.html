@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block titulo %}Inventario — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Inventario</h1>
+</div>
+
+<p class="texto-ayuda">
+    Cuánto hay de cada producto en cada sede. Aquí registras los ingresos de mercadería (compras o producción propia) y corriges
+    el stock con un conteo físico; cada cambio queda en el historial del producto (kárdex) con quién lo hizo y por qué.
+</p>
+
+{% if provisionales %}
+<div class="alerta alerta-warning" role="note" style="margin-bottom:16px">
+    {{ provisionales }} producto(s) de esta sede tienen un stock <strong>estimado</strong> (provisional), calculado a partir de las ventas.
+    Haz un conteo físico de cada uno para que las recomendaciones de reposición usen el stock real.
+</div>
+{% endif %}
+
+<form method="GET" class="tarjeta" style="margin-bottom:18px" role="search">
+    <div class="fila-formulario">
+        <div>
+            <label for="id_sede">Sede</label>
+            <select id="id_sede" name="id_sede">
+                {% for s in sedes %}
+                <option value="{{ s.id_sede }}" {% if id_sede == s.id_sede %}selected{% endif %}>{{ s.nombre_sede }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="q">Producto o código</label>
+            <input type="search" id="q" name="q" value="{{ busqueda }}" placeholder="Buscar...">
+        </div>
+        <div>
+            <label for="alerta">Mostrar</label>
+            <select id="alerta" name="alerta">
+                <option value="" {% if not solo_alerta %}selected{% endif %}>Todos los productos</option>
+                <option value="1" {% if solo_alerta %}selected{% endif %}>Solo los que están bajo su mínimo</option>
+            </select>
+        </div>
+        <div style="flex:0; align-self:flex-end"><button type="submit" class="boton-secundario">Filtrar</button></div>
+    </div>
+</form>
+
+<div class="tarjeta">
+    <p class="texto-ayuda" style="margin-top:0">{{ total }} producto(s).</p>
+    <table class="tabla" id="tabla-inventario">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Categoría</th>
+                <th>Stock</th>
+                <th>Mínimo</th>
+                <th>Situación</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for producto, stock in filas %}
+            {% set cantidad = stock.cantidad_actual if stock else 0 %}
+            <tr>
+                <td>{{ producto.nombre_producto }}<div class="texto-ayuda" style="margin:2px 0 0">{{ producto.codigo_producto }}</div></td>
+                <td>{{ producto.categoria.nombre_categoria }}</td>
+                <td class="{% if cantidad == 0 %}stock-critico{% endif %}">{{ cantidad }} {{ producto.unidad.abreviatura }}</td>
+                <td>{{ producto.stock_minimo }}</td>
+                <td>
+                    {% if stock is none %}<span class="etiqueta etiqueta-inactivo">Sin registro</span>
+                    {% elif cantidad < producto.stock_minimo %}<span class="etiqueta etiqueta-alerta">Bajo el mínimo</span>
+                    {% else %}<span class="etiqueta etiqueta-activo">Correcto</span>{% endif %}
+                    {% if stock and stock.origen == 'provisional' %}<span class="etiqueta etiqueta-pendiente" title="Estimado a partir de las ventas; falta el conteo físico">Estimado</span>{% endif %}
+                </td>
+                <td class="celda-acciones">
+                    <a href="{{ url_for('inventario.detalle', id_producto=producto.id_producto) }}" class="boton-secundario">Movimientos</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="sin-resultados">No se encontraron productos.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% set endpoint = 'inventario.listar' %}
+    {% set parametros = {'id_sede': id_sede, 'q': busqueda, 'alerta': '1' if solo_alerta else ''} %}
+    {% include "_paginacion_servidor.html" %}
+</div>
+{% endblock %}

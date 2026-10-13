@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block titulo %}Inventario de {{ producto.nombre_producto }} — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Inventario: {{ producto.nombre_producto }}</h1>
+    <a href="{{ url_for('inventario.listar') }}" class="boton-secundario">Volver al inventario</a>
+</div>
+
+<div class="tarjeta" style="margin-bottom:18px">
+    <h2 style="font-size:16px;margin-top:0">Stock por sede</h2>
+    <table class="tabla">
+        <thead><tr><th>Sede</th><th>Stock</th><th>Mínimo</th><th>Origen del dato</th><th>Última actualización</th></tr></thead>
+        <tbody>
+            {% for s in sedes %}
+            {% set fila = stock.get(s.id_sede) %}
+            <tr>
+                <td>{{ s.nombre_sede }}</td>
+                <td class="{% if not fila or fila.cantidad_actual == 0 %}stock-critico{% endif %}">
+                    {{ fila.cantidad_actual if fila else 0 }} {{ producto.unidad.abreviatura }}
+                </td>
+                <td>{{ producto.stock_minimo }}</td>
+                <td>
+                    {% if not fila %}<span class="etiqueta etiqueta-inactivo">Sin registro</span>
+                    {% elif fila.origen == 'provisional' %}<span class="etiqueta etiqueta-pendiente">Estimado</span>
+                    {% else %}<span class="etiqueta etiqueta-activo">Conteo real</span>{% endif %}
+                </td>
+                <td>{{ fila.fecha_actualizacion.strftime('%d/%m/%Y %H:%M') if fila and fila.fecha_actualizacion else '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="grid-graficos" style="margin-bottom:18px">
+    <div class="tarjeta">
+        <h2 style="font-size:16px;margin-top:0">Registrar un ingreso</h2>
+        <p class="texto-ayuda" style="margin-top:0">Suma unidades al stock: mercadería comprada, producción propia o una devolución.</p>
+        <form method="POST" action="{{ url_for('inventario.registrar_ingreso', id_producto=producto.id_producto) }}" data-una-vez>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="token_envio" value="{{ token_envio }}">
+            <label for="ingreso_sede">Sede</label>
+            <select id="ingreso_sede" name="id_sede" required>
+                {% for s in sedes %}<option value="{{ s.id_sede }}" {% if s.id_sede == sede_defecto %}selected{% endif %}>{{ s.nombre_sede }}</option>{% endfor %}
+            </select>
+            <label for="ingreso_cantidad">Cantidad que ingresa</label>
+            <input type="number" id="ingreso_cantidad" name="cantidad" min="1" max="{{ cantidad_maxima }}" step="1" required>
+            <label for="ingreso_motivo">Motivo</label>
+            <select id="ingreso_motivo" name="motivo" required>
+                {% for clave, texto in motivos_ingreso.items() %}<option value="{{ clave }}">{{ texto }}</option>{% endfor %}
+            </select>
+            <label for="ingreso_detalle">Detalle (opcional)</label>
+            <input type="text" id="ingreso_detalle" name="detalle" maxlength="100" placeholder="Ej. Factura F001-123 o lote de producción">
+            <div class="acciones-formulario">
+                <button type="submit" class="boton-primario" data-texto-enviando="Guardando...">Registrar ingreso</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="tarjeta">
+        <h2 style="font-size:16px;margin-top:0">Registrar un conteo físico</h2>
+        <p class="texto-ayuda" style="margin-top:0">Fija el stock en lo que contaste en el almacén. La diferencia queda registrada y el dato pasa a ser real.</p>
+        <form method="POST" action="{{ url_for('inventario.registrar_conteo', id_producto=producto.id_producto) }}"
+              data-una-vez>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="token_envio" value="{{ token_conteo }}">
+            <label for="conteo_sede">Sede</label>
+            <select id="conteo_sede" name="id_sede" required>
+                {% for s in sedes %}<option value="{{ s.id_sede }}" {% if s.id_sede == sede_defecto %}selected{% endif %}>{{ s.nombre_sede }}</option>{% endfor %}
+            </select>
+            <label for="conteo_cantidad">Cantidad contada</label>
+            <input type="number" id="conteo_cantidad" name="conteo" min="0" max="{{ cantidad_maxima }}" step="1" required>
+            <label for="conteo_detalle">Nota del conteo</label>
+            <input type="text" id="conteo_detalle" name="detalle" minlength="3" maxlength="100" required
+                   placeholder="Ej. Conteo del almacén, 14/10">
+            <div class="acciones-formulario">
+                <button type="submit" class="boton-primario" data-texto-enviando="Guardando...">Registrar conteo</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="tarjeta">
+    <h2 style="font-size:16px;margin-top:0">Historial de movimientos (kárdex)</h2>
+    <p class="texto-ayuda" style="margin-top:0">Los últimos {{ movimientos|length }} movimientos de este producto, del más reciente al más antiguo.</p>
+    <table class="tabla">
+        <thead>
+            <tr><th>Fecha</th><th>Sede</th><th>Movimiento</th><th>Cantidad</th><th>Quedó</th><th>Motivo</th><th>Registró</th></tr>
+        </thead>
+        <tbody>
+            {% for m in movimientos %}
+            <tr>
+                <td>{{ m.fecha_hora.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>{{ m.sede.nombre_sede }}</td>
+                <td>{{ tipos.get(m.tipo, m.tipo) }}</td>
+                <td><strong>{{ '%+d'|format(m.cantidad) }}</strong></td>
+                <td>{{ m.stock_resultante }}</td>
+                <td>{{ m.motivo or '—' }}{% if m.venta %} <a href="{{ url_for('ventas.detalle', id_venta=m.id_venta) }}">({{ m.venta.numero_operacion }})</a>{% endif %}</td>
+                <td>{{ m.usuario.nombre_completo }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="sin-resultados">Todavía no hay movimientos registrados para este producto.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

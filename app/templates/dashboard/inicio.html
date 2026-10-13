@@ -52,6 +52,41 @@
     </div>
 </div>
 
+{% if control %}
+<div class="tarjeta" style="margin-bottom:18px">
+    <h2 style="font-size:16px;margin-top:0">
+        Control y seguridad
+        {% if control.alerta %}<span class="etiqueta etiqueta-alerta">Revisar</span>{% else %}<span class="etiqueta etiqueta-activo">Sin novedades</span>{% endif %}
+        <a href="{{ url_for('auditoria.listar') }}" class="boton-secundario" style="float:right">Ver la auditoría</a>
+    </h2>
+    {% if control.alerta %}
+    <div class="alerta alerta-warning" role="alert" style="margin-bottom:12px">
+        Hubo actividad sospechosa en las últimas 24 horas: {{ control.accesos_fallidos }} intento(s) de acceso fallido(s),
+        {{ control.bloqueos }} bloqueo(s) de cuenta y {{ control.denegados }} acción(es) denegada(s).
+        Revisa quién fue en la <a href="{{ url_for('auditoria.listar', resultado='fallo') }}">auditoría</a>.
+    </div>
+    {% endif %}
+    <div class="grid-kpis" style="margin-bottom:0">
+        <div class="tarjeta tarjeta-kpi">
+            <div class="etiqueta-kpi">Accesos fallidos <small>(últimas 24 horas)</small></div>
+            <div class="valor-kpi">{{ control.accesos_fallidos }}</div>
+        </div>
+        <div class="tarjeta tarjeta-kpi">
+            <div class="etiqueta-kpi">Ventas anuladas <small>(últimos 7 días)</small></div>
+            <div class="valor-kpi">{{ control.anulaciones }}</div>
+        </div>
+        <div class="tarjeta tarjeta-kpi">
+            <div class="etiqueta-kpi">Ventas con precio rebajado <small>(últimos 7 días)</small></div>
+            <div class="valor-kpi">{{ control.rebajas }}</div>
+        </div>
+        <div class="tarjeta tarjeta-kpi">
+            <div class="etiqueta-kpi">Conteos de inventario <small>(últimos 7 días)</small></div>
+            <div class="valor-kpi">{{ control.conteos }}</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% if panorama %}
 <div class="tarjeta" style="margin-bottom:18px">
     <h2 style="font-size:16px;margin-top:0">

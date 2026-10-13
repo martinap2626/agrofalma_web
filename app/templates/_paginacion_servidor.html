@@ -1,0 +1,13 @@
+{# Navegación entre páginas de un listado paginado por el servidor.
+   Parámetros: endpoint (nombre de la ruta), parametros (dict con los filtros a conservar), pagina, total_paginas. #}
+{% if total_paginas > 1 %}
+<nav class="paginacion" aria-label="Páginas del listado">
+    {% if pagina > 1 %}
+    <a class="boton-secundario" href="{{ url_for(endpoint, pagina=pagina-1, **parametros) }}" rel="prev">← Anterior</a>
+    {% endif %}
+    <span class="paginacion-info">Página {{ pagina }} de {{ total_paginas }}</span>
+    {% if pagina < total_paginas %}
+    <a class="boton-secundario" href="{{ url_for(endpoint, pagina=pagina+1, **parametros) }}" rel="next">Siguiente →</a>
+    {% endif %}
+</nav>
+{% endif %}

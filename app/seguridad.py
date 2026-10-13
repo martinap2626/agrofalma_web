@@ -11,16 +11,17 @@ Todo vive en un solo módulo para que las reglas de seguridad se puedan
 auditar en un único lugar, en vez de estar repartidas por cada blueprint.
 """
 
+import hashlib
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from flask import current_app, request
 from flask_login import current_user
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
-from app.models.bitacora import Bitacora
+from app.models.bitacora import Bitacora, BitacoraCadena
 
 # hash de relleno: se compara contra él cuando el usuario no existe, para que
 # el login tarde lo mismo exista o no la cuenta (evita adivinar usuarios
@@ -36,20 +37,55 @@ CONTRASENAS_COMUNES = {
 # ---------------------------------------------------------------------------
 # Bitácora de auditoría
 # ---------------------------------------------------------------------------
+HUELLA_INICIAL = "0" * 64  # "huella anterior" de la primera fila de la cadena
+
+
+# huella (SHA-256) de una fila: depende de TODO su contenido y de la huella de la fila anterior
+def calcular_huella(previo, fila):
+    partes = [
+        previo,
+        fila.fecha_hora.strftime("%Y-%m-%d %H:%M:%S"),
+        str(fila.id_usuario) if fila.id_usuario is not None else "",
+        fila.usuario_login or "",
+        fila.accion or "",
+        fila.entidad or "",
+        fila.id_entidad or "",
+        fila.detalle or "",
+        fila.ip or "",
+        fila.resultado or "",
+    ]
+    return hashlib.sha256("\x1f".join(partes).encode("utf-8")).hexdigest()
+
+
+# trae (y bloquea hasta el commit) la fila que guarda la huella de la última entrada de la bitácora
+def _bloquear_cadena():
+    cadena = BitacoraCadena.query.filter_by(id=1).with_for_update().populate_existing().first()
+    if cadena is None:
+        cadena = BitacoraCadena(id=1, ultimo_hash=HUELLA_INICIAL, total=0)
+        db.session.add(cadena)
+        db.session.flush()
+    return cadena
+
+
 # agrega una fila a la bitácora; un fallo al auditar nunca debe tumbar la operación del usuario
 def registrar_accion(accion, entidad=None, id_entidad=None, detalle=None, resultado="exito",
                      usuario_login=None, id_usuario=None):
     """
     Llamar SIEMPRE después del commit de la operación principal: esta función
     hace su propio commit, y no debe arrastrar cambios a medio guardar.
-    """
-    try:
-        if current_user and current_user.is_authenticated:
-            id_usuario = id_usuario or current_user.id_usuario
-            usuario_login = usuario_login or current_user.usuario_login
 
-        db.session.add(
-            Bitacora(
+    Cada fila se encadena con la anterior mediante una huella (ver Bitacora). La fila de la cadena se bloquea mientras
+    se agrega el eslabón, de modo que dos acciones simultáneas quedan una detrás de otra y la cadena no se bifurca.
+    """
+    for intento in (1, 2):
+        try:
+            if current_user and current_user.is_authenticated:
+                id_usuario = id_usuario or current_user.id_usuario
+                usuario_login = usuario_login or current_user.usuario_login
+
+            fila = Bitacora(
+                # sin fracciones de segundo: MySQL las redondea y la huella no coincidiría al verificarla
+                fecha_hora=datetime.now().replace(microsecond=0),
                 id_usuario=id_usuario,
                 usuario_login=(usuario_login or None) and usuario_login[:30],
                 accion=accion,
@@ -59,11 +95,89 @@ def registrar_accion(accion, entidad=None, id_entidad=None, detalle=None, result
                 ip=(request.remote_addr or "")[:45] or None,
                 resultado=resultado,
             )
+            cadena = _bloquear_cadena()
+            fila.hash_previo = cadena.ultimo_hash
+            fila.hash_fila = calcular_huella(cadena.ultimo_hash, fila)
+            cadena.ultimo_hash = fila.hash_fila
+            cadena.total = (cadena.total or 0) + 1
+            db.session.add(fila)
+            db.session.commit()
+            return
+        except IntegrityError:
+            # dos procesos intentaron crear a la vez la fila de la cadena: el segundo reintenta y ya la encuentra
+            db.session.rollback()
+            if intento == 2:
+                current_app.logger.error("No se pudo escribir en la bitácora (%s): conflicto al crear la cadena", accion)
+        except SQLAlchemyError as error:
+            db.session.rollback()
+            current_app.logger.error("No se pudo escribir en la bitácora (%s): %s", accion, error)
+            return
+
+
+# recorre la cadena de la bitácora y dice si alguna fila fue alterada o borrada directamente en la base de datos
+def verificar_bitacora():
+    """
+    Devuelve un diccionario con:
+      ok                   True si la cadena está íntegra
+      verificadas          filas con huella revisadas
+      sin_huella_previas   filas anteriores a la función de huellas (no se pueden verificar)
+      problemas            lista de textos (vacía si todo está bien)
+      total_registrado     cuántas filas encadenadas debería haber según la fila de la cadena
+      ultimo_hash          huella de la última fila (conviene anotarla o conservarla junto al respaldo)
+    """
+    problemas = []
+    esperado_previo = HUELLA_INICIAL
+    verificadas = sin_huella_previas = 0
+    ultimo_id = 0
+    iniciada = False
+
+    while True:
+        lote = (
+            Bitacora.query.filter(Bitacora.id_bitacora > ultimo_id).order_by(Bitacora.id_bitacora).limit(2000).all()
         )
-        db.session.commit()
-    except SQLAlchemyError as error:
-        db.session.rollback()
-        current_app.logger.error("No se pudo escribir en la bitácora (%s): %s", accion, error)
+        if not lote:
+            break
+        for fila in lote:
+            ultimo_id = fila.id_bitacora
+            if fila.hash_fila is None:
+                if iniciada:
+                    problemas.append(f"La fila {fila.id_bitacora} no tiene huella y está dentro de la cadena (¿insertada a mano?).")
+                else:
+                    sin_huella_previas += 1
+                continue
+            iniciada = True
+            if fila.hash_previo != esperado_previo:
+                problemas.append(
+                    f"La fila {fila.id_bitacora} no encaja con la anterior (se borró o se movió alguna fila entre ambas)."
+                )
+            if calcular_huella(fila.hash_previo or "", fila) != fila.hash_fila:
+                problemas.append(f"La fila {fila.id_bitacora} fue modificada: su contenido ya no coincide con su huella.")
+            esperado_previo = fila.hash_fila
+            verificadas += 1
+        db.session.expire_all()
+
+    cadena = db.session.get(BitacoraCadena, 1)
+    total_registrado = cadena.total if cadena else 0
+    if cadena is not None:
+        if cadena.ultimo_hash != esperado_previo:
+            problemas.append("La última fila de la bitácora no coincide con la huella guardada (se borraron filas finales).")
+        if cadena.total != verificadas:
+            problemas.append(f"Debería haber {cadena.total} filas encadenadas y hay {verificadas}.")
+    elif verificadas:
+        problemas.append("Falta la fila de control de la cadena.")
+
+    return {
+        "ok": not problemas, "verificadas": verificadas, "sin_huella_previas": sin_huella_previas,
+        "problemas": problemas[:20], "total_registrado": total_registrado, "ultimo_hash": esperado_previo,
+    }
+
+
+# cuántas veces hizo este usuario esa acción en la ventana de tiempo (para limitar abusos, ej. exportaciones)
+def acciones_recientes(accion, id_usuario, ventana_min):
+    desde = datetime.now() - timedelta(minutes=ventana_min)
+    return Bitacora.query.filter(
+        Bitacora.accion == accion, Bitacora.id_usuario == id_usuario, Bitacora.fecha_hora > desde
+    ).count()
 
 
 # ---------------------------------------------------------------------------

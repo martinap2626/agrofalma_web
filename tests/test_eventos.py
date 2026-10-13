@@ -8,6 +8,7 @@ import pytest
 
 from analitica_job.pipeline.ejecutar import _aplicar_ajustes
 from analitica_job.pipeline.recomendaciones import simular
+from app.extensions import db
 from app.models import Bitacora, EventoNegocio
 
 
@@ -44,7 +45,7 @@ def test_el_administrador_registra_edita_y_elimina_un_evento(app, admin, datos):
     assert "Se agotó una semana" in texto(admin.get("/eventos"))
     assert admin.post(f"/eventos/{id_evento}/editar", data=formulario(datos, cantidad_no_atendida="55")).status_code == 302
     with app.app_context():
-        assert EventoNegocio.query.get(id_evento).cantidad_no_atendida == 55
+        assert db.session.get(EventoNegocio, id_evento).cantidad_no_atendida == 55
     assert admin.post(f"/eventos/{id_evento}/eliminar").status_code == 302
     with app.app_context():
         assert EventoNegocio.query.count() == 0

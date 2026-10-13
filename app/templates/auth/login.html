@@ -9,7 +9,7 @@
 </head>
 <body class="pagina-login">
     <div class="login-tarjeta">
-        <div class="login-panel-marca">
+        <header class="login-panel-marca">
             <img src="{{ url_for('static', filename='img/logo_agrofalma.png') }}"
                  alt="Agrofalma y Consultores EIRL" class="marca-logo-grande">
             <p class="login-eyebrow">TU MEJOR ELECCIÓN</p>
@@ -18,10 +18,10 @@
                 Consultoría, fabricación y venta para Vid, Palta, Arándanos, Espárrago,
                 Banano, Cebolla y Pimientos.
             </p>
-            <p class="login-ubicacion">📍 Chiclayo · Lambayeque, Perú</p>
-        </div>
+            <p class="login-ubicacion">{{ icono('ubicacion', 14) }} Chiclayo · Lambayeque, Perú</p>
+        </header>
 
-        <div class="login-panel-form">
+        <main class="login-panel-form">
             <h2>Iniciar sesión</h2>
             <p class="login-subtitulo">Ingresa tus credenciales para continuar</p>
 
@@ -48,7 +48,7 @@
 
                 <button type="submit" class="boton-primario boton-ancho">Ingresar</button>
             </form>
-        </div>
+        </main>
     </div>
 
     <script src="{{ url_for('static', filename='js/ojito-contrasena.js') }}"></script>

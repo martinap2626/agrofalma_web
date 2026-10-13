@@ -1,28 +1,65 @@
 # Sitio de nginx (Linux) con HTTPS. Reemplazar el dominio y las rutas de los certificados (por ejemplo con certbot).
+# NOTA: plantilla no probada en el equipo de desarrollo; verificar en el servidor con `nginx -t` y con https://www.ssllabs.com/ssltest/
+
+# Límites de peticiones por dirección IP (se declaran fuera de "server"): frenan la fuerza bruta contra el inicio de sesión
+# y el abuso en general. El sistema ya bloquea cuentas tras 5 intentos fallidos; esto protege además contra la inundación de peticiones.
+limit_req_zone $binary_remote_addr zone=agrofalma_login:10m rate=10r/m;
+limit_req_zone $binary_remote_addr zone=agrofalma_general:10m rate=20r/s;
+limit_req_status 429;
+
 server {
     listen 80;
     server_name sistema.ejemplo.pe;
+    server_tokens off;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl;
+    http2 on;
     server_name sistema.ejemplo.pe;
+    server_tokens off;                          # no revelar la versión de nginx
+
     ssl_certificate     /etc/letsencrypt/live/sistema.ejemplo.pe/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/sistema.ejemplo.pe/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;              # sin protocolos antiguos inseguros
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
 
-    client_max_body_size 5m;
+    client_max_body_size 1m;                    # el sistema no recibe archivos grandes
+    client_body_timeout 15s;
+    client_header_timeout 15s;
+    proxy_read_timeout 60s;
+
+    # datos que nginx le pasa a la aplicación (la IP real del visitante y si la conexión fue HTTPS)
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    # la aplicación ya envía su propia cabecera HSTS cuando la petición llega por HTTPS
 
     location /static/ {
         alias /opt/agrofalma/agrofalma_web/app/static/;
         expires 7d;
+        add_header X-Content-Type-Options "nosniff" always;
     }
-    location / {
+
+    # inicio de sesión: como máximo 10 intentos por minuto desde una misma IP (con una ráfaga corta de 5)
+    location = /login {
+        limit_req zone=agrofalma_login burst=5 nodelay;
         proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-Host $host;
+    }
+
+    # ruta de salud para el monitoreo (UptimeRobot, etc.): sin límite y sin llenar el registro de accesos
+    location = /salud {
+        access_log off;
+        proxy_pass http://127.0.0.1:8000;
+    }
+
+    location / {
+        limit_req zone=agrofalma_general burst=40 nodelay;
+        proxy_pass http://127.0.0.1:8000;
     }
 }
