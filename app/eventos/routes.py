@@ -20,7 +20,7 @@ from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
 from app.extensions import db
 from app.models import EventoNegocio, Producto, Sede
 from app.models.evento_negocio import IMPACTOS, TIPOS_EVENTO
-from app.seguridad import registrar_accion, validar_largo
+from app.seguridad import describir_cambios, registrar_accion, validar_largo
 
 bp = Blueprint("eventos", __name__, url_prefix="/eventos")
 
@@ -165,10 +165,16 @@ def editar(id_evento):
         try:
             datos, errores = _validar(request.form)
             if not errores:
+                cambios = describir_cambios(
+                    evento, datos,
+                    {"tipo": "tipo", "fecha_inicio": "inicio", "fecha_fin": "fin", "descripcion": "descripción",
+                     "impacto": "impacto", "id_producto": "producto", "id_sede": "sede",
+                     "cantidad_no_atendida": "cantidad no atendida", "es_ejemplo": "es ejemplo"})
                 for campo, valor in datos.items():
                     setattr(evento, campo, valor)
                 db.session.commit()
-                registrar_accion("evento_editado", "evento", evento.id_evento, evento.descripcion)
+                registrar_accion("evento_editado", "evento", evento.id_evento,
+                                 f"{evento.descripcion}: {cambios or 'sin cambios'}")
                 flash("Evento actualizado.", "success")
                 return redirect(url_for("eventos.listar"))
         except SQLAlchemyError as error:
@@ -195,7 +201,7 @@ def eliminar(id_evento):
     if evento is None:
         flash("El evento no existe.", "danger")
         return redirect(url_for("eventos.listar"))
-    descripcion = evento.descripcion
+    descripcion = f"{evento.descripcion} ({evento.tipo}, {evento.fecha_inicio:%d/%m/%Y})"
     try:
         db.session.delete(evento)
         db.session.commit()

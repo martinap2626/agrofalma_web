@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 import click
+from app.seguridad import auditado
 
 OK, AVISO, FALLO = "OK", "AVISO", "FALLO"
 RAIZ = Path(__file__).resolve().parent.parent
@@ -165,6 +166,7 @@ def diagnosticar(app) -> list[tuple[str, str, str]]:
 
 def registrar_comandos_despliegue(app) -> None:
     @app.cli.command("preparar-bd")
+    @auditado("consola_preparar_bd", "flask preparar-bd (estructura de la base puesta al día)")
     def preparar_bd():
         """Crea las tablas, columnas e índices que falten, sin tocar los datos (se puede repetir sin problema)."""
         from sqlalchemy import inspect

@@ -52,6 +52,7 @@ from pathlib import Path
 import click
 import pymysql
 from cryptography.fernet import Fernet, InvalidToken
+from app.seguridad import auditado
 
 CARPETA_RESPALDOS = Path(__file__).resolve().parent.parent / "respaldos"
 RESPALDOS_A_CONSERVAR = 7  # retencion: se borran los mas antiguos que estos
@@ -339,6 +340,7 @@ def registrar_comando_respaldo(app) -> None:
         "--conservar-externo", default=RESPALDOS_EXTERNOS_A_CONSERVAR,
         help=f"Cuántos respaldos conservar en la copia fuera del equipo (default: {RESPALDOS_EXTERNOS_A_CONSERVAR}).",
     )
+    @auditado("consola_respaldo", "flask respaldar-bd")
     def respaldar_bd(conservar, conservar_externo):
         """Genera un volcado completo de la base de datos con mysqldump, lo comprime y lo cifra (si hay clave
         RESPALDO_CLAVE), aplica retención y deja una copia fuera del equipo (si hay RESPALDO_COPIA_DIR)."""
@@ -385,6 +387,7 @@ def registrar_comando_respaldo(app) -> None:
     @click.option("--destino", required=True, help="Base de datos donde restaurar (se crea si no existe).")
     @click.option("--sobrescribir", is_flag=True,
                   help="Obligatorio para restaurar encima de la base de datos en uso de la aplicación.")
+    @auditado("consola_restauracion", "flask restaurar-bd")
     def restaurar_bd(archivo, destino, sobrescribir):
         """Restaura un respaldo .sql. Por seguridad, no toca la base en uso
         salvo que se pida explícitamente con --sobrescribir."""

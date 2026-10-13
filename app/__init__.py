@@ -11,6 +11,7 @@ ejecutan dentro de una única aplicación.
 import click
 from flask import Flask
 from flask_wtf.csrf import CSRFError
+from app.seguridad import auditado
 from sqlalchemy.exc import SQLAlchemyError
 
 from pathlib import Path
@@ -284,6 +285,7 @@ def _registrar_comandos_cli(app):
     # le pone una contraseña real a los usuarios de prueba que vienen con el hash pendiente
     @app.cli.command("seed-passwords")
     @click.option("--password", default=None, help="Contraseña a asignar. Si se omite, se genera una aleatoria.")
+    @auditado("consola_seed_passwords", "flask seed-passwords")
     def seed_passwords(password):
         """
         Asigna una contraseña real (con hash) a los usuarios que trae el

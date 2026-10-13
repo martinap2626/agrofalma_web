@@ -193,7 +193,11 @@ def test_respaldar_bd_cifra_copia_fuera_del_equipo_y_restaurar_bd_lo_recupera(ap
     try:
         r = ejecutor.invoke(args=["restaurar-bd", str(externo[0]), "--destino", destino])  # se restaura desde la COPIA externa
         assert r.exit_code == 0, r.output
-        assert contar_filas(Config, destino) == contar_filas(Config, NOMBRE_BD_PRUEBAS)
+        restaurada, actual = contar_filas(Config, destino), contar_filas(Config, NOMBRE_BD_PRUEBAS)
+        # la copia se toma antes de anotar la operación: la base en uso solo tiene de más las 2 filas de consola
+        # (respaldo y restauración), que quedan en la bitácora
+        assert actual.pop("bitacora_acciones") - restaurada.pop("bitacora_acciones") == 2
+        assert restaurada == actual
     finally:
         _eliminar_bd(Config, destino)
         _eliminar_bd(Config, BD_TEMPORAL_VERIFICACION)

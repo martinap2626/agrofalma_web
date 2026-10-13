@@ -18,6 +18,8 @@ from pathlib import Path
 
 import click
 
+from app.seguridad import auditado
+
 CARPETA_PLANTILLAS = Path(__file__).resolve().parent.parent / "analitica_job" / "datos_procesados"
 
 
@@ -43,6 +45,7 @@ def registrar_comandos_analitica(app) -> None:
     @click.option("--aplicar", is_flag=True, help="Sin esta opción solo muestra qué haría (simulación).")
     @click.option("--reemplazar-prueba", is_flag=True,
                   help="Borra productos, ventas y resultados de PRUEBA para dejar solo el catálogo real. Hace un respaldo antes.")
+    @auditado("consola_cargar_catalogo", "flask cargar-catalogo-base", solo_si="aplicar")
     def cargar_catalogo_base(aplicar, reemplazar_prueba):
         """Carga el catálogo de productos base construido con los Excel de Pimentel."""
         from analitica_job.pipeline.catalogo import construir_catalogo
@@ -88,6 +91,7 @@ def registrar_comandos_analitica(app) -> None:
     @app.cli.command("cargar-inventario")
     @click.argument("archivo", type=click.Path(exists=True, dir_okay=False, path_type=Path))
     @click.option("--aplicar", is_flag=True, help="Sin esta opción solo valida el archivo.")
+    @auditado("consola_cargar_inventario", "flask cargar-inventario (Excel del gerente)", solo_si="aplicar")
     def cargar_inventario_cmd(archivo, aplicar):
         """Carga el stock actual desde el Excel llenado por el gerente."""
         from app.servicios_analitica import cargar_inventario
@@ -102,6 +106,7 @@ def registrar_comandos_analitica(app) -> None:
     @click.option("--aplicar", is_flag=True, help="Sin esta opción solo muestra qué haría.")
     @click.option("--meses-cobertura", default=1.5, show_default=True, help="Meses de venta promedio que se asumen en stock.")
     @click.option("--minimo", default=5, show_default=True, help="Stock mínimo asignado a cada producto para poder venderlo.")
+    @auditado("consola_cargar_inventario", "flask cargar-inventario-provisional (stock estimado)", solo_si="aplicar")
     def cargar_inventario_provisional(aplicar, meses_cobertura, minimo):
         """Estima un stock PROVISIONAL (marcado como tal) a partir de las ventas, mientras no haya conteo real."""
         from analitica_job.pipeline.catalogo import construir_catalogo
@@ -120,6 +125,7 @@ def registrar_comandos_analitica(app) -> None:
     @app.cli.command("actualizar-analitica")
     @click.option("--anio-desde", default=2023, show_default=True, help="Primer año de datos con el que se entrena.")
     @click.option("--sin-guardar", is_flag=True, help="Solo calcula y exporta el Excel, sin escribir en la base de datos.")
+    @auditado("consola_actualizar_analitica", "flask actualizar-analitica")
     def actualizar_analitica(anio_desde, sin_guardar):
         """Corre el pipeline de analítica (Pimentel) y guarda predicción, segmentación ABC y recomendaciones."""
         from analitica_job.pipeline.ejecutar import ejecutar, exportar_excel

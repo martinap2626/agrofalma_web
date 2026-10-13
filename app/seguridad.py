@@ -11,11 +11,13 @@ Todo vive en un solo módulo para que las reglas de seguridad se puedan
 auditar en un único lugar, en vez de estar repartidas por cada blueprint.
 """
 
+import functools
+import getpass
 import hashlib
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
-from flask import current_app, request
+from flask import current_app, has_request_context, request
 from flask_login import current_user
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -92,7 +94,8 @@ def registrar_accion(accion, entidad=None, id_entidad=None, detalle=None, result
                 entidad=entidad,
                 id_entidad=str(id_entidad) if id_entidad is not None else None,
                 detalle=detalle[:255] if detalle else None,
-                ip=(request.remote_addr or "")[:45] or None,
+                # desde la consola (sin petición web) no hay dirección IP
+                ip=((request.remote_addr or "")[:45] or None) if has_request_context() else None,
                 resultado=resultado,
             )
             cadena = _bloquear_cadena()
@@ -112,6 +115,75 @@ def registrar_accion(accion, entidad=None, id_entidad=None, detalle=None, result
             db.session.rollback()
             current_app.logger.error("No se pudo escribir en la bitácora (%s): %s", accion, error)
             return
+
+
+# ---------------------------------------------------------------------------
+# Qué cambió exactamente (valor anterior y nuevo) y operaciones hechas desde la consola
+# ---------------------------------------------------------------------------
+def _como_texto(valor):
+    if valor is None or valor == "":
+        return "vacío"
+    if isinstance(valor, bool):
+        return "Sí" if valor else "No"
+    if isinstance(valor, Decimal):
+        return f"{valor:.2f}"
+    return str(valor)
+
+
+def describir_cambios(objeto, nuevos: dict, etiquetas: dict, formato: dict | None = None) -> str:
+    """
+    Texto con lo que cambia al editar un registro: «precio de 50.00 a 55.00; stock mínimo de 5 a 8». Solo menciona los campos
+    que de verdad cambian y debe llamarse ANTES de aplicar los cambios al objeto. `etiquetas` = {campo: nombre en español};
+    `formato` = {campo: función} para mostrar, por ejemplo, el nombre de una categoría en vez de su número. Las contraseñas
+    nunca se pasan por aquí: se anotan solo como «contraseña cambiada».
+    """
+    formato = formato or {}
+    partes = []
+    for campo, etiqueta in etiquetas.items():
+        if campo not in nuevos:
+            continue
+        mostrar = formato.get(campo, _como_texto)
+        antes, despues = mostrar(getattr(objeto, campo)), mostrar(nuevos[campo])
+        if antes != despues:
+            partes.append(f"{etiqueta} de {antes} a {despues}")
+    return "; ".join(partes)
+
+
+# anota en la bitácora una operación hecha desde la consola (restaurar la base, cargar inventario, actualizar la analítica...):
+# quien la hizo queda como «consola:usuario del sistema operativo», porque no hay una cuenta de la aplicación
+def registrar_accion_consola(accion, detalle=None, resultado="exito"):
+    try:
+        usuario_so = getpass.getuser()
+    except Exception:  # noqa: BLE001 - algunos entornos no tienen usuario del sistema
+        usuario_so = "desconocido"
+    registrar_accion(accion, detalle=detalle, resultado=resultado, usuario_login=f"consola:{usuario_so}"[:30])
+
+
+def auditado(accion, detalle=None, solo_si=None):
+    """
+    Decorador para los comandos de consola que cambian datos: deja en la bitácora que se ejecutó, quién lo hizo y si salió
+    bien o falló (incluye los comandos que terminan con SystemExit distinto de cero). `solo_si="aplicar"` omite la
+    auditoría cuando el comando corre en modo simulación (esa opción no se pasó), porque entonces no cambió nada.
+    """
+    def decorador(funcion):
+        @functools.wraps(funcion)
+        def envoltura(*args, **kwargs):
+            if solo_si is not None and not kwargs.get(solo_si):
+                return funcion(*args, **kwargs)
+            try:
+                resultado = funcion(*args, **kwargs)
+            except SystemExit as salida:
+                registrar_accion_consola(accion, detalle, "exito" if salida.code in (None, 0) else "fallo")
+                raise
+            except Exception as error:
+                registrar_accion_consola(accion, f"{detalle or ''} (error: {type(error).__name__})".strip(), "fallo")
+                raise
+            registrar_accion_consola(accion, detalle)
+            return resultado
+
+        return envoltura
+
+    return decorador
 
 
 # recorre la cadena de la bitácora y dice si alguna fila fue alterada o borrada directamente en la base de datos

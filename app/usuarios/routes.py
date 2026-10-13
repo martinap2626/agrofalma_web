@@ -16,7 +16,7 @@ from app.extensions import db
 from app.decorators import rol_requerido
 from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
 from app.models import Usuario, Rol, Sede
-from app.seguridad import registrar_accion, validar_contrasena, validar_largo
+from app.seguridad import describir_cambios, registrar_accion, validar_contrasena, validar_largo
 
 bp = Blueprint("usuarios", __name__, url_prefix="/usuarios")
 
@@ -118,6 +118,15 @@ def editar(id_usuario):
         datos, errores = _validar_formulario(request.form, es_nuevo=False, id_usuario_actual=id_usuario)
 
         if not errores:
+            nombres_rol = {r.id_rol: r.nombre_rol for r in Rol.query.all()}
+            nombres_sede = {s.id_sede: s.nombre_sede for s in Sede.query.all()}
+            cambios = describir_cambios(
+                usuario, datos,
+                {"nombre": "nombre", "apellido": "apellido", "correo": "correo", "id_rol": "rol", "id_sede": "sede"},
+                {"id_rol": lambda v: nombres_rol.get(v, str(v)), "id_sede": lambda v: nombres_sede.get(v, str(v))},
+            )
+            if datos["contrasena"]:
+                cambios = (cambios + "; " if cambios else "") + "contraseña cambiada"
             usuario.nombre = datos["nombre"]
             usuario.apellido = datos["apellido"]
             usuario.correo = datos["correo"]
@@ -133,8 +142,7 @@ def editar(id_usuario):
                     session["sv"] = usuario.version_sesion
                 registrar_accion(
                     "usuario_editado", "usuario", usuario.id_usuario,
-                    f"{usuario.usuario_login} (rol {usuario.rol.nombre_rol})"
-                    + ("; contraseña cambiada" if datos["contrasena"] else ""),
+                    f"{usuario.usuario_login}: {cambios or 'sin cambios'}",
                 )
                 flash(f'Usuario "{usuario.usuario_login}" actualizado correctamente.', "success")
                 return redirect(url_for("usuarios.listar"))

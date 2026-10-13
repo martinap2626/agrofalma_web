@@ -21,6 +21,7 @@ import calendar
 from datetime import datetime
 
 import click
+from app.seguridad import auditado
 
 PREFIJO = "H"
 CLIENTE_GENERICO = "Cliente varios (histórico)"
@@ -50,6 +51,7 @@ def registrar_comando_historico(app) -> None:
     @app.cli.command("importar-ventas-historicas")
     @click.option("--aplicar", is_flag=True, help="Escribe en la base de datos (sin esto solo simula).")
     @click.option("--reemplazar", is_flag=True, help="Borra antes las ventas históricas ya importadas.")
+    @auditado("consola_importar_historico", "flask importar-ventas-historicas", solo_si="aplicar")
     def importar(aplicar, reemplazar):
         from werkzeug.security import generate_password_hash
 
@@ -132,6 +134,7 @@ EVENTOS_EJEMPLO = [
 
 def registrar_comandos_eventos_ejemplo(app) -> None:
     @app.cli.command("cargar-eventos-ejemplo")
+    @auditado("consola_eventos_ejemplo", "flask cargar-eventos-ejemplo")
     def cargar_eventos_ejemplo():
         """Carga eventos de EJEMPLO (marcados como tales) para ver la pantalla con datos; no afectan los cálculos."""
         from datetime import date
@@ -155,6 +158,7 @@ def registrar_comandos_eventos_ejemplo(app) -> None:
         click.echo(f"{n} eventos de ejemplo cargados (marcados como ejemplo; no afectan los cálculos).")
 
     @app.cli.command("quitar-eventos-ejemplo")
+    @auditado("consola_eventos_ejemplo", "flask quitar-eventos-ejemplo")
     def quitar_eventos_ejemplo():
         """Borra todos los eventos marcados como ejemplo."""
         from app.extensions import db

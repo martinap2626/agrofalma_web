@@ -24,7 +24,7 @@ from app.extensions import db
 from app.decorators import rol_requerido
 from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion as _registrar_error_conexion
 from app.models import Producto, Categoria, UnidadMedida
-from app.seguridad import leer_decimal, registrar_accion, validar_largo
+from app.seguridad import describir_cambios, leer_decimal, registrar_accion, validar_largo
 
 bp = Blueprint("productos", __name__, url_prefix="/productos")
 
@@ -157,11 +157,22 @@ def editar(id_producto):
             ), 503
 
         if not errores:
+            nombres_categoria = {c.id_categoria: c.nombre_categoria for c in categorias}
+            nombres_unidad = {u.id_unidad: u.nombre_unidad for u in unidades}
+            cambios = describir_cambios(
+                producto, datos,
+                {"codigo_producto": "código", "nombre_producto": "nombre", "id_categoria": "categoría",
+                 "id_unidad": "unidad", "precio_unitario": "precio", "stock_minimo": "stock mínimo",
+                 "descripcion": "descripción"},
+                {"id_categoria": lambda v: nombres_categoria.get(v, str(v)),
+                 "id_unidad": lambda v: nombres_unidad.get(v, str(v))},
+            )
             for campo, valor in datos.items():
                 setattr(producto, campo, valor)
             try:
                 db.session.commit()
-                registrar_accion("producto_editado", "producto", producto.id_producto, producto.nombre_producto)
+                registrar_accion("producto_editado", "producto", producto.id_producto,
+                                 f"{producto.nombre_producto}: {cambios or 'sin cambios'}")
                 flash(f'Producto "{producto.nombre_producto}" actualizado correctamente.', "success")
                 return redirect(url_for("productos.listar"))
             except IntegrityError:

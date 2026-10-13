@@ -24,7 +24,7 @@ from app.errores_bd import MENSAJE_ERROR_CONEXION, es_clave_repetida, registrar_
 from app.paginacion import paginar
 from app.servicios_inventario import StockInsuficiente, descontar_por_venta, devolver_por_anulacion
 from app.utilidades_fecha import rango_dia, rango_fechas
-from app.seguridad import leer_decimal, puede_ver_venta, registrar_accion, validar_largo
+from app.seguridad import describir_cambios, leer_decimal, puede_ver_venta, registrar_accion, validar_largo
 from app.validaciones import validar_documento
 from app.models import (
     Categoria, Cliente, Credito, DetalleVenta, Producto, Recuperacion, Sede, StockPorSede,
@@ -651,11 +651,14 @@ def editar_cliente(id_cliente):
             return render_template("clientes/formulario.html", cliente=cliente, valores=request.form), 503
 
         if not errores:
+            cambios = describir_cambios(
+                cliente, datos, {"nombre_cliente": "nombre", "documento": "documento", "telefono": "teléfono"})
             for campo, valor in datos.items():
                 setattr(cliente, campo, valor)
             try:
                 db.session.commit()
-                registrar_accion("cliente_editado", "cliente", cliente.id_cliente, cliente.nombre_cliente)
+                registrar_accion("cliente_editado", "cliente", cliente.id_cliente,
+                                 f"{cliente.nombre_cliente}: {cambios or 'sin cambios'}")
                 flash(f'Cliente "{cliente.nombre_cliente}" actualizado correctamente.', "success")
                 return redirect(url_for("ventas.listar_clientes"))
             except SQLAlchemyError as error:
