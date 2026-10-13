@@ -24,6 +24,7 @@ from app.errores_bd import MENSAJE_ERROR_CONEXION, es_clave_repetida, registrar_
 from app.paginacion import paginar
 from app.servicios_inventario import StockInsuficiente, descontar_por_venta, devolver_por_anulacion
 from app.utilidades_fecha import rango_dia, rango_fechas
+from app.parametros import obtener as obtener_parametro
 from app.seguridad import describir_cambios, leer_decimal, puede_ver_venta, registrar_accion, validar_largo
 from app.validaciones import validar_documento
 from app.models import (
@@ -353,7 +354,7 @@ def _registrar_venta(form, productos, token_envio):
     productos_por_id = {p.id_producto: p for p in productos}
     errores = []
     # descuento máximo que un Trabajador puede dar sin autorización (el Administrador no tiene tope, pero queda registrado)
-    descuento_maximo = float(current_app.config["DESCUENTO_MAX_TRABAJADOR_PCT"])
+    descuento_maximo = float(obtener_parametro("descuento_max_trabajador_pct"))
     rebajas = []
 
     id_cliente_raw = form.get("id_cliente", "")

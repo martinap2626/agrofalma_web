@@ -26,7 +26,7 @@ from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
 from app.extensions import db
 import json
 
-from analitica_job.pipeline.recomendaciones import PARAMETROS
+from app.parametros import parametros_vigentes
 from app.simulador import ESCENARIOS, LIMITES, calcular, leer_entrada
 from app.servicios_analitica import ultima_ejecucion
 from app.models import (
@@ -131,7 +131,7 @@ def recomendaciones():
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return render_template(
             "analitica/recomendaciones.html", recomendaciones=[], filtro_urgencia=filtro_urgencia, ejecucion=None,
-            parametros=PARAMETROS, hay_plan=False, hay_inventario=False, resumen=None,
+            parametros=parametros_vigentes(), hay_plan=False, hay_inventario=False, resumen=None,
         ), 503
 
     hay_plan = any(r.nivel_urgencia == "plan" for r in todas)
@@ -147,7 +147,7 @@ def recomendaciones():
 
     return render_template(
         "analitica/recomendaciones.html", recomendaciones=filas, filtro_urgencia=filtro_urgencia,
-        ejecucion=_ejecucion_o_none(), parametros=PARAMETROS, hay_plan=hay_plan, hay_inventario=hay_inventario,
+        ejecucion=_ejecucion_o_none(), parametros=parametros_vigentes(), hay_plan=hay_plan, hay_inventario=hay_inventario,
         resumen=resumen,
     )
 
@@ -218,7 +218,7 @@ def simulador():
         registrar_error_conexion("abrir simulador de escenarios", error)
         flash(MENSAJE_ERROR_CONEXION, "danger")
         return render_template("analitica/simulador.html", recs=[], rec=None, resultado=None, entrada=None, ejecucion=None,
-                               parametros=PARAMETROS, escenarios=ESCENARIOS, limites=LIMITES, stock_registrado=None), 503
+                               parametros=parametros_vigentes(), escenarios=ESCENARIOS, limites=LIMITES, stock_registrado=None), 503
 
     id_txt = request.args.get("id_producto", "").strip()
     rec = next((r for r in recs if str(r.id_producto) == id_txt), None)
@@ -229,7 +229,7 @@ def simulador():
         entrada = leer_entrada(request.args, stock_registrado)
         resultado = calcular(rec, entrada)
     return render_template("analitica/simulador.html", recs=recs, rec=rec, resultado=resultado, entrada=entrada,
-                           ejecucion=_ejecucion_o_none(), parametros=PARAMETROS, escenarios=ESCENARIOS, limites=LIMITES,
+                           ejecucion=_ejecucion_o_none(), parametros=parametros_vigentes(), escenarios=ESCENARIOS, limites=LIMITES,
                            stock_registrado=stock_registrado)
 
 

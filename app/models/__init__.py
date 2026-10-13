@@ -43,6 +43,7 @@ from app.models.movimiento_inventario import MovimientoInventario
 from app.models.ejecucion_analitica import EjecucionAnalitica
 from app.models.plan_campana import PlanCampana
 from app.models.evento_negocio import EventoNegocio
+from app.models.parametro_sistema import ParametroSistema
 
 __all__ = [
     "Bitacora",
@@ -51,6 +52,7 @@ __all__ = [
     "EjecucionAnalitica",
     "PlanCampana",
     "EventoNegocio",
+    "ParametroSistema",
     "Rol",
     "Sede",
     "Usuario",

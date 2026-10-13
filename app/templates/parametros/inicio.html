@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titulo %}Parámetros — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Parámetros del sistema</h1>
+</div>
+
+<p class="login-subtitulo">
+    Ajusta aquí los valores que usa el sistema, sin pedir cambios de programa. Cada cambio queda en la Auditoría con el valor anterior y el nuevo.
+</p>
+
+<div class="tarjeta tarjeta-formulario">
+    <form method="POST" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% for d in definiciones %}
+        <label for="{{ d.clave }}">{{ d.etiqueta }} ({{ d.unidad }})</label>
+        <input type="number" id="{{ d.clave }}" name="{{ d.clave }}" required
+               min="{{ '%g'|format(d.minimo) }}" max="{{ '%g'|format(d.maximo) }}" step="{{ '1' if d.entero else '0.1' }}"
+               value="{{ '%g'|format(actuales[d.clave]|float) if actuales[d.clave] not in (none, '') else '' }}"
+               aria-describedby="ayuda-{{ d.clave }}">
+        <p class="login-subtitulo" id="ayuda-{{ d.clave }}" style="margin:4px 0 12px">
+            {{ d.ayuda }} Valor permitido: de {{ '%g'|format(d.minimo) }} a {{ '%g'|format(d.maximo) }} {{ d.unidad }}. De fábrica: {{ '%g'|format(d.defecto) }}.
+        </p>
+        {% endfor %}
+
+        <div class="acciones-formulario">
+            <button type="submit" class="boton-primario">Guardar parámetros</button>
+            <a href="{{ url_for('dashboard.inicio') }}" class="boton-secundario">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<div class="tarjeta">
+    <h2>Cuándo se nota cada cambio</h2>
+    <ul>
+        <li>El descuento máximo y los días de reposición del <strong>Simulador</strong> se aplican de inmediato.</li>
+        <li>Los días de reposición y la protección de las <strong>Recomendaciones</strong> se aplican la próxima vez que se actualiza la analítica.</li>
+    </ul>
+</div>
+{% endblock %}

@@ -16,7 +16,8 @@ from __future__ import annotations
 import math
 from datetime import date, timedelta
 
-from analitica_job.pipeline.recomendaciones import PARAMETROS, simular
+from analitica_job.pipeline.recomendaciones import simular
+from app.parametros import parametros_vigentes
 
 ESCENARIOS = {
     "normal": "Sin cambios (la situación actual)",
@@ -103,7 +104,7 @@ def calcular(rec, entrada: dict, hoy: date | None = None) -> dict:
     margen = float(rec.stock_seguridad or 0)
     stock = entrada["stock"]
     escenario, valores = entrada["escenario"], entrada["valores"]
-    dias_normal = PARAMETROS.tiempo_reposicion_dias
+    dias_normal = parametros_vigentes().tiempo_reposicion_dias
 
     demanda_esc, dias_esc = demanda, dias_normal
     if escenario == "mas":

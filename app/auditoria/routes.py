@@ -25,6 +25,7 @@ ETIQUETAS_ACCION = {
     "login_bloqueado": "Acceso bloqueado por intentos fallidos",
     "login_cuenta_inactiva": "Intento de acceso con cuenta desactivada",
     "logout": "Cierre de sesión",
+    "parametros_editados": "Parámetros del sistema modificados",
     "consola_respaldo": "Consola: respaldo de la base",
     "consola_restauracion": "Consola: restauración de la base",
     "consola_importar_historico": "Consola: importación de ventas históricas",

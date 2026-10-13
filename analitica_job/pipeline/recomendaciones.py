@@ -32,6 +32,7 @@ SUPUESTOS a confirmar con el gerente: el tiempo de reposición (hoy 15 días) y 
 from __future__ import annotations
 
 import math
+from statistics import NormalDist
 from dataclasses import dataclass, field
 
 import pandas as pd
@@ -54,8 +55,7 @@ class Parametros:
 
     def nivel_proteccion_pct(self, clase: str) -> int:
         """Probabilidad aproximada de no quedarse sin stock (z de una normal), para explicarlo al usuario."""
-        z = self.z_por_clase[clase]
-        return {1.65: 95, 1.28: 90, 0.84: 80}.get(round(z, 2), 0)
+        return round(NormalDist().cdf(self.z_por_clase[clase]) * 100)
 
 
 PARAMETROS = Parametros()

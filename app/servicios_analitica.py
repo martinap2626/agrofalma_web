@@ -453,7 +453,9 @@ def _guardar_recomendaciones(res, productos, generar) -> int:
     inventario = pd.DataFrame(
         [{"producto": n, "stock_actual": stock[p.id_producto]} for n, p in productos.items() if p.id_producto in stock]
     )
-    recs = generar(demanda, inventario, res.reparto_presentaciones)
+    from app.parametros import parametros_vigentes
+
+    recs = generar(demanda, inventario, res.reparto_presentaciones, parametros_vigentes())
     ajustes = res.extra.get("ajustes") if isinstance(res.extra, dict) else None
     con_quiebre = {} if ajustes is None or len(ajustes) == 0 else ajustes.groupby("base")["unidades"].sum().to_dict()
     n = 0

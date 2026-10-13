@@ -65,6 +65,7 @@ def create_app(config_class=Config):
     from app.ayuda import bp as ayuda_bp
     from app.eventos import bp as eventos_bp
     from app.inventario import bp as inventario_bp
+    from app.parametros.routes import bp as parametros_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(productos_bp)
@@ -77,6 +78,7 @@ def create_app(config_class=Config):
     app.register_blueprint(ayuda_bp)
     app.register_blueprint(eventos_bp)
     app.register_blueprint(inventario_bp)
+    app.register_blueprint(parametros_bp)
 
     # --- Cabeceras HTTP de seguridad en todas las respuestas ---------------
     from app.seguridad import aplicar_cabeceras

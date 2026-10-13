@@ -60,6 +60,10 @@
                    class="menu-item {% if request.blueprint == 'auditoria' %}activo{% endif %}">
                     <span>Auditoría</span>
                 </a>
+                <a href="{{ url_for('parametros.inicio') }}"
+                   class="menu-item {% if request.blueprint == 'parametros' %}activo{% endif %}">
+                    <span>Parámetros</span>
+                </a>
                 {% endif %}
                 {% if current_user.is_authenticated %}
                 <a href="{{ url_for('ayuda.inicio') }}"

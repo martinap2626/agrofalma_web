@@ -89,7 +89,7 @@ def test_preparar_bd_deja_una_base_nueva_bajo_control_de_versiones_y_es_repetibl
     assert r.exit_code == 0, r.output
     assert "control de versiones del esquema iniciado" in r.output
     with app_vacia.app_context():
-        assert revision_actual() == REVISION_INICIAL
+        assert revision_actual() == revision_mas_reciente()
         assert estado_migraciones()[0] == "al_dia"
         assert diferencias_con_los_modelos() == []
     segunda = ejecutor.invoke(args=["preparar-bd"])
@@ -126,7 +126,7 @@ def test_verificar_despliegue_avisa_si_a_la_base_le_faltan_migraciones(app_vacia
         assert niveles["Migraciones"] == AVISO  # sin control de versiones todavía
         from flask_migrate import stamp
 
-        stamp(directory=str(CARPETA_MIGRACIONES), revision=REVISION_INICIAL)
+        stamp(directory=str(CARPETA_MIGRACIONES), revision=revision_mas_reciente())
         assert {tema: nivel for nivel, tema, _ in diagnosticar(app_vacia)}["Migraciones"] == OK
 
         def marcar(revision):
@@ -139,4 +139,4 @@ def test_verificar_despliegue_avisa_si_a_la_base_le_faltan_migraciones(app_vacia
             niveles = {tema: nivel for nivel, tema, _ in diagnosticar(app_vacia)}
             assert niveles["Migraciones"] == FALLO
         finally:
-            marcar(REVISION_INICIAL)
+            marcar(revision_mas_reciente())
