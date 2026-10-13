@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block titulo %}{{ producto.nombre_producto }} — Ficha del producto — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Analítica comercial</h1>
+</div>
+{% include "analitica/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h2>{{ producto.nombre_producto }}</h2>
+    <div class="acciones-cabecera">
+        {% if rec %}<a class="boton-secundario" href="{{ url_for('analitica.simulador', id_producto=producto.id_producto) }}">Simular escenarios</a>{% endif %}
+    </div>
+</div>
+<p class="login-subtitulo">
+    Código {{ producto.codigo_producto }}
+    {% if rec and rec.clase_abc %} · Clase {{ rec.clase_abc }} {{ info('A: los productos que más pesan en las ventas. B: venta intermedia. C: poca venta.') }}{% endif %}
+    {% if confiabilidad %} · Confiabilidad del pronóstico: <strong>{{ confiabilidad }}</strong>{% endif %}
+</p>
+
+{% if demanda is none %}
+<div class="tarjeta"><p>Todavía no hay una predicción para este producto. Aparecerá cuando se actualice la analítica y el producto tenga ventas suficientes.</p></div>
+{% else %}
+<div class="grid-kpis">
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Venta esperada del mes {{ info('Las unidades que se espera vender el próximo mes. No es lo que hay que comprar: para eso mira «Reponer».') }}</div>
+        <div class="valor-kpi">{{ "%.0f"|format(demanda) }}</div>
+        {% if pred and pred.periodo_objetivo %}<div class="etiqueta-kpi"><small>unidades en {{ pred.periodo_objetivo.strftime('%m/%Y') }}</small></div>{% endif %}
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Rango probable {{ info('Lo que es razonable esperar: la venta esperada más y menos el error que este producto tuvo al compararlo con lo que de verdad se vendió (' ~ rango.error_pct ~ ' %). No es una garantía.') }}</div>
+        <div class="valor-kpi">{{ rango.minimo_maximo[0] }} a {{ rango.minimo_maximo[1] }}</div>
+        <div class="etiqueta-kpi"><small>unidades</small></div>
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Vendido el último mes con datos {{ info('Sirve para comparar con la venta esperada. En productos de campaña puede bajar solo porque terminó la temporada.') }}</div>
+        <div class="valor-kpi">{% if pred and pred.venta_mes_anterior is not none %}{{ "%.0f"|format(pred.venta_mes_anterior) }}{% else %}—{% endif %}</div>
+        {% if pred and pred.venta_mes_anterior and pred.tendencia_pct is not none %}
+        <div class="etiqueta-kpi"><small>{{ 'Se espera que suba' if pred.tendencia_pct > 0 else 'Se espera que baje' if pred.tendencia_pct < 0 else 'Se espera igual' }} ({{ "%+.0f"|format(pred.tendencia_pct) }} %)</small></div>
+        {% endif %}
+    </div>
+    <div class="tarjeta tarjeta-kpi">
+        <div class="etiqueta-kpi">Riesgo de quedarse sin producto {{ info('Probabilidad aproximada de que el stock no alcance hasta que llegue la reposición (' ~ parametros.tiempo_reposicion_dias ~ ' días). Se estima con el stock de hoy, lo que se espera vender y cuánto suele equivocarse el pronóstico en este producto.') }}</div>
+        {% if riesgo %}
+        <div class="valor-kpi">
+            {% if riesgo.nivel == 'Alto' %}<span class="etiqueta etiqueta-alerta">Alto</span>
+            {% elif riesgo.nivel == 'Medio' %}<span class="etiqueta etiqueta-pendiente">Medio</span>
+            {% else %}<span class="etiqueta etiqueta-activo">Bajo</span>{% endif %}
+        </div>
+        <div class="etiqueta-kpi"><small>aprox. {{ riesgo.probabilidad_pct }} % de probabilidad</small></div>
+        {% else %}
+        <div class="valor-kpi">—</div>
+        <div class="etiqueta-kpi"><small>no hay un stock registrado</small></div>
+        {% endif %}
+    </div>
+</div>
+
+{% if rec %}
+<div class="tarjeta">
+    <h3>Qué hacer con el stock</h3>
+    <table class="tabla">
+        <tbody>
+            <tr><th scope="row">Stock registrado hoy</th><td>{{ rec.stock_actual if rec.con_inventario and rec.stock_actual is not none else 'Sin registrar' }}</td></tr>
+            <tr><th scope="row">Punto de reposición {{ info('Por debajo de esta cantidad conviene pedir.') }}</th><td>{{ rec.punto_pedido if rec.punto_pedido is not none else '—' }}</td></tr>
+            <tr><th scope="row">Tener disponible {{ info('Hasta cuánto conviene tener: lo que se espera vender, lo que se vende mientras llega la reposición y un margen de seguridad.') }}</th><td>{{ rec.stock_objetivo if rec.stock_objetivo is not none else '—' }}</td></tr>
+            <tr><th scope="row">Reponer</th><td><strong>{{ rec.cantidad_sugerida }}</strong>{% if rec.reparto %} <small>({{ rec.reparto }})</small>{% endif %}</td></tr>
+        </tbody>
+    </table>
+    {% if rec.motivo %}<p class="texto-ayuda">{{ rec.motivo }}</p>{% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+<div class="tarjeta">
+    <h3>Ventas de los últimos 12 meses</h3>
+    <table class="tabla">
+        <caption class="solo-lector">Unidades vendidas por mes de {{ producto.nombre_producto }}</caption>
+        <thead><tr><th scope="col">Mes</th><th scope="col">Unidades</th><th scope="col"><span class="solo-lector">Gráfico</span></th></tr></thead>
+        <tbody>
+            {% for m in meses %}
+            <tr>
+                <td>{{ m.etiqueta }}</td>
+                <td>{{ m.unidades }}</td>
+                <td style="width:50%"><div style="background:var(--verde-primario);height:10px;border-radius:5px;width:{{ m.ancho_pct }}%" role="presentation"></div></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p class="texto-ayuda">Solo cuentan las ventas registradas en la plataforma y las importadas del historial; las ventas anuladas no se incluyen. Un mes en cero significa que no hubo ventas registradas.</p>
+</div>
+
+{% if eventos %}
+<div class="tarjeta">
+    <h3>Eventos del negocio que pueden explicar meses atípicos</h3>
+    <ul>
+        {% for e in eventos %}
+        <li>{{ e.fecha_inicio.strftime('%d/%m/%Y') }}: {% if e.es_ejemplo %}[Ejemplo] {% endif %}{{ e.descripcion }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

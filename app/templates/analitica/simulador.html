@@ -160,6 +160,35 @@
 </div>
 {% endif %}
 
+{% if resultado.comparacion %}
+<div class="tarjeta">
+    <h2 style="font-size:16px;margin-top:0">Los escenarios lado a lado {{ info('Con el mismo stock, así cambia el resultado según lo que pase. Sirve para decidir cuánto reponer sin tener que probar uno por uno.') }}</h2>
+    <div class="tabla-responsive">
+    <table class="tabla">
+        <caption class="solo-lector">Comparación de escenarios para {{ resultado.producto }}</caption>
+        <thead>
+            <tr>
+                <th scope="col">Escenario</th><th scope="col">Se vendería</th><th scope="col">El stock alcanza para</th>
+                <th scope="col">¿Se acaba antes de la reposición?</th><th scope="col">Conviene reponer</th><th scope="col">Valor aprox. (precio de venta)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in resultado.comparacion %}
+            <tr {% if c.elegido %}aria-current="true" style="font-weight:600"{% endif %}>
+                <th scope="row">{{ c.titulo }}{% if c.elegido %} <span class="etiqueta etiqueta-activo">elegido</span>{% endif %}</th>
+                <td>{{ '%g'|format(c.demanda|round(0)) }} unidades</td>
+                <td>{% if c.dias_alcanza is none %}—{% elif c.dias_alcanza > 365 %}más de 1 año{% else %}{{ '%g'|format(c.dias_alcanza) }} días{% endif %}</td>
+                <td>{% if c.antes_de_reposicion is none %}—{% elif c.antes_de_reposicion %}<span class="etiqueta etiqueta-alerta">Sí, antes de los {{ c.dias_reposicion }} días</span>{% else %}<span class="etiqueta etiqueta-activo">No</span>{% endif %}</td>
+                <td>{{ c.cantidad }} unidades</td>
+                <td>S/ {{ '{:,.2f}'.format(c.valor_referencia).replace(',', ' ') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
+
 <details class="tarjeta explicacion">
     <summary>Ver el detalle del cálculo</summary>
     <table class="tabla">

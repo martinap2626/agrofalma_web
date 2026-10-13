@@ -111,7 +111,7 @@
         <tbody>
             {% for f in filas %}
             <tr>
-                <td>{{ f.producto.nombre_producto }}</td>
+                <td><a href="{{ url_for('analitica.ficha_de_producto', id_producto=f.id_producto) }}">{{ f.producto.nombre_producto }}</a></td>
                 <td>
                     {% if f.clase_abc == 'A' %}<span class="etiqueta etiqueta-activo">A</span>
                     {% elif f.clase_abc == 'B' %}<span class="etiqueta etiqueta-pendiente">B</span>

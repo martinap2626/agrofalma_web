@@ -80,7 +80,7 @@
             {% for p in predicciones %}
             {% set clase = clases.get(p.id_producto) %}
             <tr>
-                <td>{{ p.producto.nombre_producto }}{% if eventos_por_producto and p.id_producto in eventos_por_producto %} <span class="etiqueta etiqueta-pendiente" title="{{ eventos_por_producto[p.id_producto]|join(' | ') }}">Evento</span>{% endif %}</td>
+                <td><a href="{{ url_for('analitica.ficha_de_producto', id_producto=p.id_producto) }}">{{ p.producto.nombre_producto }}</a>{% if eventos_por_producto and p.id_producto in eventos_por_producto %} <span class="etiqueta etiqueta-pendiente" title="{{ eventos_por_producto[p.id_producto]|join(' | ') }}">Evento</span>{% endif %}</td>
                 <td>{{ p.producto.categoria.nombre_categoria }}</td>
                 <td>
                     {% if clase == 'A' %}<span class="etiqueta etiqueta-activo">A</span>

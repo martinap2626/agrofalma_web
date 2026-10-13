@@ -146,6 +146,25 @@ def calcular(rec, entrada: dict, hoy: date | None = None) -> dict:
     }
 
 
+def comparar_escenarios(rec, entrada: dict, hoy: date | None = None) -> list[dict]:
+    """
+    Los cuatro escenarios listos (situación actual, se vende más, se vende menos, la reposición demora) con el mismo stock, para verlos
+    lado a lado: cuánto se vendería, para cuántos días alcanza, si se acaba antes de que llegue la reposición, cuánto reponer y cuánto cuesta.
+    Usa los valores que el usuario tiene escritos en cada escenario (o los de siempre) y no cambia el escenario elegido.
+    """
+    filas = []
+    for clave in ("normal", "mas", "menos", "demora"):
+        r = calcular(rec, {**entrada, "escenario": clave}, hoy)
+        e = r["esc"]
+        filas.append({
+            "clave": clave, "titulo": r["titulo"], "demanda": e["demanda"], "dias_alcanza": e["dias_alcanza"],
+            "fecha_agota": e["fecha_agota"], "antes_de_reposicion": e["antes_de_reposicion"], "dias_reposicion": e["dias_reposicion"],
+            "nivel": e["nivel"], "cantidad": e["cantidad"], "valor_referencia": e["valor_referencia"],
+            "elegido": clave == entrada["escenario"],
+        })
+    return filas
+
+
 def _frases(base, esc, escenario, valores, demanda, stock, diferencia) -> list[tuple[str, str]]:
     """Cuenta el resultado en palabras: lista de (tipo, texto); tipo = 'normal', 'alerta' o 'bien'."""
     frases = []

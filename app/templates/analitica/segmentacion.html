@@ -84,7 +84,7 @@
         <tbody>
             {% for s in segmentaciones %}
             <tr>
-                <td>{{ s.producto.nombre_producto }}</td>
+                <td><a href="{{ url_for('analitica.ficha_de_producto', id_producto=s.id_producto) }}">{{ s.producto.nombre_producto }}</a></td>
                 <td>{{ s.producto.categoria.nombre_categoria }}</td>
                 <td>{{ s.periodo_inicio.strftime('%m/%Y') }} – {{ s.periodo_fin.strftime('%m/%Y') }}</td>
                 <td><span class="monto">S/ {{ "%.2f"|format(s.ventas_periodo) }}</span></td>

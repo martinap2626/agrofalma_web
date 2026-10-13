@@ -282,3 +282,26 @@ def test_las_explicaciones_cortas_son_accesibles_por_teclado_y_lector_de_pantall
 
     seguro = str(info('Texto con "comillas" y <etiquetas>'))
     assert "<etiquetas>" not in seguro and "&lt;etiquetas&gt;" in seguro  # el texto se escapa: no puede inyectar HTML
+
+
+# ---------------------------------------------------------------------------
+# Comparar escenarios
+# ---------------------------------------------------------------------------
+def test_comparar_escenarios_devuelve_los_cuatro_con_el_mismo_stock():
+    from app.simulador import comparar_escenarios
+
+    filas = comparar_escenarios(recomendacion(), entrada("mas", stock=40, mas=50), HOY)
+    assert [f["clave"] for f in filas] == ["normal", "mas", "menos", "demora"]
+    por = {f["clave"]: f for f in filas}
+    assert por["normal"]["demanda"] == 40 and por["mas"]["demanda"] == 60 and por["menos"]["demanda"] == 32
+    assert [f["elegido"] for f in filas] == [False, True, False, False]
+    assert por["mas"]["dias_alcanza"] < por["normal"]["dias_alcanza"] < por["menos"]["dias_alcanza"]
+    assert por["demora"]["dias_reposicion"] == 30 and por["demora"]["demanda"] == 40
+    assert por["demora"]["antes_de_reposicion"] is False  # 30 días de stock justo alcanzan para los 30 de reposición
+
+
+def test_la_pantalla_muestra_los_escenarios_lado_a_lado_solo_si_hay_stock(admin, recomendacion_en_bd):
+    con = texto(admin.get(f"/analitica/simulador?id_producto={recomendacion_en_bd}&escenario=mas&valor_mas=50"))
+    assert "Los escenarios lado a lado" in con and "elegido" in con and "Si se vende un 20 % menos" in con
+    sin = texto(admin.get(f"/analitica/simulador?id_producto={recomendacion_en_bd}&stock=abc"))
+    assert "Los escenarios lado a lado" in sin  # con un stock inválido se usa el registrado

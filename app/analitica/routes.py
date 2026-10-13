@@ -17,7 +17,7 @@ no son el resultado real de evaluación del modelo.
 from datetime import date, timedelta
 from decimal import Decimal
 
-from flask import Blueprint, render_template, request, flash
+from flask import Blueprint, redirect, render_template, request, flash, url_for
 from flask_login import login_required
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -26,11 +26,14 @@ from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
 from app.extensions import db
 import json
 
+from app import ficha_producto as ficha
 from app.parametros import parametros_vigentes
-from app.simulador import ESCENARIOS, LIMITES, calcular, leer_entrada
+from app.simulador import ESCENARIOS, LIMITES, calcular, comparar_escenarios, leer_entrada
 from app.servicios_analitica import ultima_ejecucion
 from app.models import (
+    DetalleVenta,
     EventoNegocio,
+    Venta,
     Producto,
     PlanCampana,
     RecomendacionAbastecimiento,
@@ -228,9 +231,51 @@ def simulador():
         stock_registrado = rec.stock_actual if rec.con_inventario else None
         entrada = leer_entrada(request.args, stock_registrado)
         resultado = calcular(rec, entrada)
+        resultado["comparacion"] = comparar_escenarios(rec, entrada) if entrada["stock"] is not None else None
     return render_template("analitica/simulador.html", recs=recs, rec=rec, resultado=resultado, entrada=entrada,
                            ejecucion=_ejecucion_o_none(), parametros=parametros_vigentes(), escenarios=ESCENARIOS, limites=LIMITES,
                            stock_registrado=stock_registrado)
+
+
+# ficha de un producto: venta esperada con su rango probable, stock y riesgo de quedarse sin producto, ventas de los últimos
+# 12 meses y eventos que explican meses atípicos (cálculos en app/ficha_producto.py)
+@bp.route("/producto/<int:id_producto>")
+@login_required
+@rol_requerido("Administrador")
+def ficha_de_producto(id_producto):
+    try:
+        producto = db.get_or_404(Producto, id_producto)
+        rec = (RecomendacionAbastecimiento.query.filter_by(id_producto=id_producto)
+               .order_by(RecomendacionAbastecimiento.fecha_generacion.desc()).first())
+        pred = (PrediccionDemanda.query.filter_by(id_producto=id_producto)
+                .order_by(PrediccionDemanda.fecha_generacion.desc()).first())
+        hoy = date.today()
+        desde = date(hoy.year - 1, hoy.month, 1)
+        ventas = (db.session.query(Venta.fecha_hora, DetalleVenta.cantidad)
+                  .join(DetalleVenta, DetalleVenta.id_venta == Venta.id_venta)
+                  .filter(DetalleVenta.id_producto == id_producto, Venta.anulada.is_(False), Venta.fecha_hora >= desde).all())
+        eventos = (EventoNegocio.query.filter(EventoNegocio.id_producto == id_producto,
+                                              EventoNegocio.fecha_inicio >= hoy - timedelta(days=365))
+                   .order_by(EventoNegocio.fecha_inicio.desc()).all())
+    except SQLAlchemyError as error:
+        registrar_error_conexion("abrir la ficha de un producto", error)
+        flash(MENSAJE_ERROR_CONEXION, "danger")
+        return redirect(url_for("analitica.recomendaciones"))
+
+    parametros = parametros_vigentes()
+    demanda = float(pred.demanda_estimada) if pred is not None else (float(rec.demanda_prevista) if rec is not None else None)
+    confiabilidad = (pred.confiabilidad if pred is not None else None) or (rec.confiabilidad if rec is not None else None)
+    rango = riesgo = None
+    if demanda is not None:
+        error = ficha.error_relativo(pred.error_validacion if pred is not None else None, confiabilidad)
+        rango = {"error_pct": round(error * 100), "minimo_maximo": ficha.rango_probable(demanda, error)}
+        stock = rec.stock_actual if rec is not None and rec.con_inventario else None
+        riesgo = ficha.riesgo_de_quiebre(stock, demanda, error, parametros.tiempo_reposicion_dias, parametros.demanda_minima)
+    return render_template(
+        "analitica/ficha_producto.html", producto=producto, rec=rec, pred=pred, demanda=demanda, confiabilidad=confiabilidad,
+        rango=rango, riesgo=riesgo, parametros=parametros, meses=ficha.ventas_por_mes([(f.date(), c) for f, c in ventas], hoy),
+        eventos=eventos, ejecucion=_ejecucion_o_none(),
+    )
 
 
 # pantalla de prediccion de demanda: una fila por producto con su ultima

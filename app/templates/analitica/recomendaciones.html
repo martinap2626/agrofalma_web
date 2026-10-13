@@ -121,7 +121,7 @@
         <tbody>
             {% for r in recomendaciones %}
             <tr>
-                <td>{{ r.producto.nombre_producto }}</td>
+                <td><a href="{{ url_for('analitica.ficha_de_producto', id_producto=r.id_producto) }}">{{ r.producto.nombre_producto }}</a></td>
                 <td>
                     {% if r.clase_abc == 'A' %}<span class="etiqueta etiqueta-activo">A</span>
                     {% elif r.clase_abc == 'B' %}<span class="etiqueta etiqueta-pendiente">B</span>
