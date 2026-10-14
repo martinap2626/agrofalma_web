@@ -1,6 +1,6 @@
 # Auditoría de accesibilidad
 
-Revisa todas las pantallas del sistema (31: acceso, 24 del Administrador y 6 del Trabajador) con dos herramientas:
+Revisa todas las pantallas del sistema (34: acceso, 27 del Administrador y 6 del Trabajador) con dos herramientas:
 
 * **axe-core**: reglas WCAG 2.1 nivel A y AA más buenas prácticas.
 * **Lighthouse**: puntaje de accesibilidad de 0 a 100.

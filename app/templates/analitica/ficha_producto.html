@@ -13,12 +13,12 @@
         {% if rec %}<a class="boton-secundario" href="{{ url_for('analitica.simulador', id_producto=producto.id_producto) }}">Simular escenarios</a>{% endif %}
     </div>
 </div>
-<p class="login-subtitulo">
+<p class="texto-ayuda" style="margin:0 0 12px">
     Código {{ producto.codigo_producto }}
     {% if rec and rec.clase_abc %} · Clase {{ rec.clase_abc }} {{ info('A: los productos que más pesan en las ventas. B: venta intermedia. C: poca venta.') }}{% endif %}
     {% if confiabilidad %} · Confiabilidad del pronóstico: <strong>{{ confiabilidad }}</strong>{% endif %}
 </p>
-<p class="login-subtitulo">Cómo se vende: <strong>{{ patron.tipo }}</strong> {{ info('Se deduce de las ventas de los últimos 12 meses: regular (casi todos los meses y sin grandes saltos), de temporada (casi todo en pocos meses), esporádica (3 meses o menos) o variable.') }}. {{ patron.texto }}</p>
+<p class="texto-ayuda" style="margin:0 0 12px">Cómo se vende: <strong>{{ patron.tipo }}</strong> {{ info('Se deduce de las ventas de los últimos 12 meses: regular (casi todos los meses y sin grandes saltos), de temporada (casi todo en pocos meses), esporádica (3 meses o menos) o variable.') }}. {{ patron.texto }}</p>
 
 {% if demanda is none %}
 <div class="tarjeta"><p>Todavía no hay una predicción para este producto. Aparecerá cuando se actualice la analítica y el producto tenga ventas suficientes.</p></div>

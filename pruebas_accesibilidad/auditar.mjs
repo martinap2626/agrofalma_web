@@ -32,7 +32,7 @@ for (const [nombre, valor] of Object.entries({ ADMIN_USUARIO: ADMIN.usuario, ADM
 const RUTAS_ADMIN = [
   "/dashboard", "/ventas", `/ventas/${ID_VENTA}`, "/ventas/nueva", "/ventas/clientes", "/ventas/clientes/nuevo", "/ventas/creditos",
   "/productos", "/productos/nuevo", "/inventario", `/inventario/${ID_PRODUCTO}`, "/analitica", "/analitica/prediccion",
-  "/analitica/segmentacion", "/analitica/campana", "/analitica/simulador",
+  "/analitica/segmentacion", "/analitica/campana", "/analitica/simulador", "/parametros", `/analitica/producto/${ID_PRODUCTO}`,
   `/analitica/simulador?id_producto=${ID_PRODUCTO}&escenario=mas&valor_mas=50`, // el simulador con un resultado y su gráfico
   "/reportes", "/eventos", "/eventos/nuevo",
   "/usuarios", "/usuarios/nuevo", "/auditoria", "/ayuda", "/cuenta/contrasena",

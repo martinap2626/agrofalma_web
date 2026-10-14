@@ -6,7 +6,7 @@
     <h1>Parámetros del sistema</h1>
 </div>
 
-<p class="login-subtitulo">
+<p class="texto-ayuda" style="margin:0 0 12px">
     Ajusta aquí los valores que usa el sistema, sin pedir cambios de programa. Cada cambio queda en la Auditoría con el valor anterior y el nuevo.
 </p>
 
@@ -19,7 +19,7 @@
                min="{{ '%g'|format(d.minimo) }}" max="{{ '%g'|format(d.maximo) }}" step="{{ '1' if d.entero else '0.1' }}"
                value="{{ '%g'|format(actuales[d.clave]|float) if actuales[d.clave] not in (none, '') else '' }}"
                aria-describedby="ayuda-{{ d.clave }}">
-        <p class="login-subtitulo" id="ayuda-{{ d.clave }}" style="margin:4px 0 12px">
+        <p class="texto-ayuda" id="ayuda-{{ d.clave }}" style="margin:4px 0 12px">
             {{ d.ayuda }} Valor permitido: de {{ '%g'|format(d.minimo) }} a {{ '%g'|format(d.maximo) }} {{ d.unidad }}. De fábrica: {{ '%g'|format(d.defecto) }}.
         </p>
         {% endfor %}
