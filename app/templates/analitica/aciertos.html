@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block titulo %}Aciertos del pronóstico — Agrofalma{% endblock %}
+
+{% block contenido %}
+<div class="cabecera-pagina">
+    <h1>Analítica comercial</h1>
+</div>
+{% include "analitica/_subnav.html" %}
+
+<div class="cabecera-pagina">
+    <h2>Aciertos del pronóstico</h2>
+</div>
+
+<p class="texto-ayuda">
+    Aquí se compara lo que el sistema esperaba vender en cada mes que ya terminó con lo que de verdad se vendió. Sirve para saber cuánto
+    confiar en el pronóstico con la experiencia del propio negocio.
+</p>
+
+{% if meses %}
+{% for m in meses %}
+<div class="tarjeta">
+    <h3>{{ m.periodo.strftime('%m/%Y') }}</h3>
+    <div class="grid-kpis">
+        <div class="tarjeta tarjeta-kpi">
+            <div class="etiqueta-kpi">Unidades esperadas</div>
+            <div class="valor-kpi">{{ m.resumen.esperado }}</div>
+        </div>
+        <div class="tarjeta tarjeta-kpi">
+            <div class="etiqueta-kpi">Unidades vendidas</div>
+            <div class="valor-kpi">{{ m.resumen.vendido }}</div>
+        </div>
+        <div class="tarjeta tarjeta-kpi">
+            <div class="etiqueta-kpi">Acierto del mes {{ info('100 % menos la suma de las diferencias entre lo esperado y lo vendido de cada producto, dividida entre lo vendido. Un 70 % significa que, sumando todos los productos, el pronóstico se desvió un 30 % de lo vendido.') }}</div>
+            <div class="valor-kpi">{{ m.resumen.acierto_pct ~ ' %' if m.resumen.acierto_pct is not none else 'Sin ventas' }}</div>
+        </div>
+        <div class="tarjeta tarjeta-kpi">
+            <div class="etiqueta-kpi">Productos dentro de su rango {{ info('Productos cuya venta real cayó dentro del rango probable que muestra su ficha.') }}</div>
+            <div class="valor-kpi">{{ m.resumen.dentro_rango }} de {{ m.resumen.productos }}</div>
+        </div>
+    </div>
+    <p>{{ m.texto }}</p>
+    {% if m.mayores %}
+    <table class="tabla">
+        <caption>Productos con mayor diferencia en {{ m.periodo.strftime('%m/%Y') }}</caption>
+        <thead><tr><th scope="col">Producto</th><th scope="col">Esperado</th><th scope="col">Vendido</th><th scope="col">Diferencia</th></tr></thead>
+        <tbody>
+            {% for f in m.mayores %}
+            <tr>
+                <td><a href="{{ url_for('analitica.ficha_de_producto', id_producto=f.id_producto) }}">{{ f.nombre }}</a></td>
+                <td>{{ f.estimado|round|int }}</td>
+                <td>{{ f.real|round|int }}</td>
+                <td>{{ '%+d'|format(f.diferencia|round|int) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+{% endfor %}
+<p class="texto-ayuda">
+    Solo se comparan meses completos y se cuentan las ventas registradas en la plataforma y las importadas del historial, sin las ventas
+    anuladas. Si un mes se calculó más de una vez, vale el último pronóstico.
+</p>
+{% else %}
+<div class="tarjeta">
+    <p class="sin-resultados">Todavía no hay meses terminados para comparar. Cuando termine el mes del pronóstico vigente, aquí se verá cuánto se
+        acertó.</p>
+</div>
+{% endif %}
+{% endblock %}

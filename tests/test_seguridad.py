@@ -141,7 +141,7 @@ def test_sin_secret_key_la_app_no_arranca():
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("ruta", [
     "/usuarios", "/usuarios/nuevo", "/auditoria", "/reportes", "/analitica", "/analitica/prediccion",
-    "/analitica/segmentacion", "/dashboard", "/productos/nuevo", "/ventas",
+    "/analitica/segmentacion", "/analitica/aciertos", "/dashboard", "/productos/nuevo", "/ventas",
 ])
 def test_trabajador_no_accede_a_modulos_de_administrador(app, trabajador_a, ruta):
     antes = contar(app, "acceso_denegado")

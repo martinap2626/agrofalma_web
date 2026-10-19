@@ -91,6 +91,27 @@
     <p class="texto-ayuda">Solo cuentan las ventas registradas en la plataforma y las importadas del historial; las ventas anuladas no se incluyen. Un mes en cero significa que no hubo ventas registradas en ese mes. La tabla termina en el mes de la última venta registrada en el sistema.</p>
 </div>
 
+{% if historial %}
+<div class="tarjeta">
+    <h3>Cuánto acertó el pronóstico en este producto</h3>
+    <table class="tabla">
+        <caption class="solo-lector">Pronóstico contra venta real de {{ producto.nombre_producto }} en meses ya terminados</caption>
+        <thead><tr><th scope="col">Mes</th><th scope="col">Se esperaba</th><th scope="col">Se vendió</th><th scope="col">Resultado</th></tr></thead>
+        <tbody>
+            {% for h in historial %}
+            <tr>
+                <td>{{ h.periodo.strftime('%m/%Y') }}</td>
+                <td>{{ h.estimado|round|int }}</td>
+                <td>{{ h.real|round|int }}</td>
+                <td>{{ 'Dentro del rango probable' if h.dentro_rango else 'Fuera del rango probable' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p class="texto-ayuda">Compara lo que el sistema esperaba con lo que de verdad se vendió en meses que ya terminaron.</p>
+</div>
+{% endif %}
+
 {% if eventos %}
 <div class="tarjeta">
     <h3>Eventos del negocio que pueden explicar meses atípicos</h3>

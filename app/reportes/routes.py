@@ -27,6 +27,9 @@ from app.models import Categoria, DetalleVenta, Producto, Sede, Venta
 from app.seguridad import acciones_recientes, registrar_accion
 from app.utilidades_fecha import rango_fechas
 
+# filas del reporte de ventas que se muestran por página; el CSV exportado siempre incluye todas
+VENTAS_POR_PAGINA = 50
+
 bp = Blueprint("reportes", __name__, url_prefix="/reportes")
 
 
@@ -41,13 +44,16 @@ def inicio():
     contexto = {
         "sedes": sedes, "tipo": tipo, "desde": desde, "hasta": hasta, "id_sede": id_sede,
         "ventas": [], "resumen_ventas": None, "productos": [], "resumen_productos": None,
+        "pagina": 1, "total_paginas": 1,
     }
 
     try:
         if tipo == "productos":
             contexto["productos"], contexto["resumen_productos"] = _reporte_productos(desde, hasta, id_sede)
         else:
-            contexto["ventas"], contexto["resumen_ventas"] = _reporte_ventas(desde, hasta, id_sede)
+            contexto["ventas"], contexto["resumen_ventas"], contexto["pagina"], contexto["total_paginas"] = (
+                _reporte_ventas(desde, hasta, id_sede, request.args.get("pagina", "1"))
+            )
     except SQLAlchemyError as error:
         registrar_error_conexion("generar reporte comercial", error)
         flash(MENSAJE_ERROR_CONEXION, "danger")
@@ -96,7 +102,7 @@ def exportar():
             for p in productos:
                 escritor.writerow([_texto_seguro(p["producto"]), _texto_seguro(p["categoria"]), p["cantidad"], f'{p["total"]:.2f}'])
         else:
-            ventas, _ = _reporte_ventas(desde, hasta, id_sede)
+            ventas, _, _, _ = _reporte_ventas(desde, hasta, id_sede)
             escritor.writerow(["N° Operación", "Fecha", "Cliente", "Sede", "Tipo", "Total (S/)"])
             for v in ventas:
                 escritor.writerow([
@@ -156,8 +162,9 @@ def _leer_filtros(args):
     return tipo, desde, hasta, id_sede
 
 
-# arma el listado y el resumen de ventas para el rango de fechas pedido
-def _reporte_ventas(desde, hasta, id_sede):
+# arma el listado y el resumen de ventas para el rango de fechas pedido; con pagina_raw=None trae todas las filas
+# (exportación), con un valor trae solo esa página para que la pantalla no cargue miles de filas
+def _reporte_ventas(desde, hasta, id_sede, pagina_raw=None):
     inicio, fin = rango_fechas(desde, hasta)
     filtro = [Venta.fecha_hora >= inicio, Venta.fecha_hora < fin, Venta.anulada.is_(False)]
     if id_sede:
@@ -177,11 +184,17 @@ def _reporte_ventas(desde, hasta, id_sede):
     }
 
     # ...y el detalle trae las filas con cliente y sede ya cargados
-    ventas = (
+    consulta = (
         Venta.query.options(db.joinedload(Venta.cliente), db.joinedload(Venta.sede))
-        .filter(*filtro).order_by(Venta.fecha_hora).all()
+        .filter(*filtro).order_by(Venta.fecha_hora)
     )
-    return ventas, resumen
+    if pagina_raw is None:
+        return consulta.all(), resumen, 1, 1
+    # el total ya se conoce por el resumen: se evita un COUNT extra sobre el mismo rango
+    pagina = max(int(pagina_raw), 1) if str(pagina_raw).isdigit() else 1
+    total_paginas = max((resumen["cantidad"] + VENTAS_POR_PAGINA - 1) // VENTAS_POR_PAGINA, 1)
+    pagina = min(pagina, total_paginas)
+    return consulta.offset((pagina - 1) * VENTAS_POR_PAGINA).limit(VENTAS_POR_PAGINA).all(), resumen, pagina, total_paginas
 
 
 # arma el listado y el resumen de productos mas vendidos para el rango de fechas pedido

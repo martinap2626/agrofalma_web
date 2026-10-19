@@ -66,6 +66,15 @@ def medir(volumen):
     token = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', html) or re.search(r'value="([^"]+)"[^>]*name="csrf_token"', html)
     r = cliente.post("/login", data={"usuario": "admin_c", "contrasena": sv.CLAVE_ADMIN, "csrf_token": token.group(1)})
     assert r.status_code == 302, "no se pudo iniciar sesión en la base de carga"
+    # recién sembrada, MySQL sigue volcando datos a disco y no tiene estadísticas de las tablas: se actualizan y cada pantalla
+    # se pide una vez antes de medir, igual que un sistema que lleva en uso más de unos segundos
+    with app.app_context():
+        for tabla in ("ventas", "detalle_ventas", "creditos", "recuperaciones", "productos", "stock_por_sede"):
+            db.session.execute(db.text(f"ANALYZE TABLE {tabla}")).fetchall()
+        db.session.commit()
+    time.sleep(5)
+    for _, ruta in PANTALLAS:
+        cliente.get(ruta)
     filas = []
     for nombre, ruta in PANTALLAS:
         tiempos, estado = [], None

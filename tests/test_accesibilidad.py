@@ -171,7 +171,7 @@ def revisar(html):
 @pytest.mark.parametrize("ruta,cliente_fixture", [
     ("/ventas/nueva", "trabajador_a"), ("/ventas/clientes/nuevo", "trabajador_a"), ("/ventas/clientes", "trabajador_a"),
     ("/productos/nuevo", "admin"), ("/usuarios/nuevo", "admin"), ("/eventos/nuevo", "admin"), ("/auditoria", "admin"),
-    ("/reportes", "admin"), ("/cuenta/contrasena", "trabajador_a"), ("/inventario", "admin"), ("/analitica/simulador", "admin"),
+    ("/reportes", "admin"), ("/cuenta/contrasena", "trabajador_a"), ("/inventario", "admin"), ("/analitica/simulador", "admin"), ("/analitica/aciertos", "admin"),
 ])
 def test_todo_campo_de_formulario_tiene_etiqueta_y_la_pagina_una_region_principal(request, ruta, cliente_fixture):
     c = request.getfixturevalue(cliente_fixture)

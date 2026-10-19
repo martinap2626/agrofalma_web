@@ -97,7 +97,7 @@
 </div>
 
 <div class="tarjeta">
-    <table class="tabla" id="tabla-reporte-ventas" data-paginacion="10">
+    <table class="tabla" id="tabla-reporte-ventas">
         <thead>
             <tr>
                 <th>N° Operación</th><th>Fecha</th><th>Cliente</th>
@@ -124,6 +124,9 @@
             {% endfor %}
         </tbody>
     </table>
+    {% set endpoint = 'reportes.inicio' %}
+    {% set parametros = {'tipo': 'ventas', 'desde': desde.isoformat(), 'hasta': hasta.isoformat(), 'id_sede': id_sede or ''} %}
+    {% include "_paginacion_servidor.html" %}
 </div>
 {% endif %}
 {% endblock %}

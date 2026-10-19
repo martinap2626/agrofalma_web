@@ -216,6 +216,24 @@ def test_cp12_reportes_en_pantalla_y_csv(admin):
     assert admin.get("/reportes?desde=basura&hasta=basura&id_sede=xx").status_code == 200
 
 
+def test_reporte_de_ventas_en_pantalla_va_por_paginas_y_el_csv_trae_todo(app, datos, admin, trabajador_a, monkeypatch):
+    from app.reportes import routes as reportes
+    monkeypatch.setattr(reportes, "VENTAS_POR_PAGINA", 2)
+    for _ in range(3):
+        nueva_venta(trabajador_a, datos, cantidad="1")
+    filtro = "tipo=ventas&desde=2020-01-01&hasta=2099-12-31"
+    # otras pruebas pueden haber dejado ventas: se compara contra el total real que informa el CSV
+    total = len([f for f in texto(admin.get(f"/reportes/exportar?{filtro}")).splitlines() if f.strip()]) - 1
+    assert total >= 3
+    paginas = (total + 1) // 2
+    uno = texto(admin.get(f"/reportes?{filtro}"))
+    assert f"Página 1 de {paginas}" in uno and uno.count("<tr>") - 1 == 2
+    ultima = texto(admin.get(f"/reportes?{filtro}&pagina={paginas}"))
+    assert f"Página {paginas} de {paginas}" in ultima and ultima.count("<tr>") - 1 == total - 2 * (paginas - 1)
+    assert admin.get(f"/reportes?{filtro}&pagina=999").status_code == 200
+    assert admin.get(f"/reportes?{filtro}&pagina=abc").status_code == 200
+
+
 # ---------------------------------------------------------------------------
 # CP-06 Créditos y recuperaciones
 # ---------------------------------------------------------------------------

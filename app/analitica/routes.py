@@ -26,7 +26,7 @@ from app.errores_bd import MENSAJE_ERROR_CONEXION, registrar_error_conexion
 from app.extensions import db
 import json
 
-from app import ficha_producto as ficha
+from app import aciertos, ficha_producto as ficha
 from app.alertas_ventas import detectar_ventas_inusuales
 from app.parametros import parametros_vigentes
 from app.simulador import ESCENARIOS, LIMITES, calcular, comparar_escenarios, leer_entrada
@@ -306,10 +306,16 @@ def ficha_de_producto(id_producto):
         stock = rec.stock_actual if rec is not None and rec.con_inventario else None
         riesgo = ficha.riesgo_de_quiebre(stock, demanda, error, parametros.tiempo_reposicion_dias, parametros.demanda_minima)
     meses = ficha.ventas_por_mes([(f.date(), c) for f, c in ventas], hoy)
+    try:
+        historial = _comparar_pronosticos_pasados(date.today(), id_producto)[:6]
+    except SQLAlchemyError as error:
+        registrar_error_conexion("leer los aciertos pasados de un producto", error)
+        db.session.rollback()
+        historial = []
     return render_template(
         "analitica/ficha_producto.html", producto=producto, rec=rec, pred=pred, demanda=demanda, confiabilidad=confiabilidad,
         rango=rango, riesgo=riesgo, parametros=parametros, meses=meses, patron=ficha.patron_de_demanda(meses),
-        eventos=eventos, ejecucion=_ejecucion_o_none(),
+        eventos=eventos, ejecucion=_ejecucion_o_none(), historial=historial,
     )
 
 
@@ -395,6 +401,59 @@ def prediccion():
         "analitica/prediccion.html", predicciones=filas, vista_previa=vista_previa, ejecucion=ejecucion, clases=clases,
         modelo=_info_modelo(ejecucion), eventos_por_producto=eventos_por_producto, resumen=resumen,
     )
+
+
+# predicciones de meses ya terminados contra lo que de verdad se vendió (cálculos en app/aciertos.py); con id_producto se
+# limita a un solo producto. Devuelve filas ordenadas del mes más reciente al más antiguo.
+def _comparar_pronosticos_pasados(hoy, id_producto=None):
+    consulta = (PrediccionDemanda.query.options(db.joinedload(PrediccionDemanda.producto))
+                .filter(PrediccionDemanda.periodo_objetivo.isnot(None),
+                        PrediccionDemanda.periodo_objetivo < hoy.replace(day=1)))
+    if id_producto is not None:
+        consulta = consulta.filter(PrediccionDemanda.id_producto == id_producto)
+    ultimas = {}
+    for p in consulta.order_by(PrediccionDemanda.fecha_generacion).all():
+        ultimas[(p.id_producto, p.periodo_objetivo)] = p  # si se recalculó el mismo mes, vale el último pronóstico
+    if not ultimas:
+        return []
+    desde = min(periodo for _, periodo in ultimas)
+    anio, mes = db.func.extract("year", Venta.fecha_hora), db.func.extract("month", Venta.fecha_hora)
+    consulta_real = (db.session.query(DetalleVenta.id_producto, anio, mes, db.func.sum(DetalleVenta.cantidad))
+                     .join(Venta, Venta.id_venta == DetalleVenta.id_venta)
+                     .filter(Venta.anulada.is_(False), Venta.fecha_hora >= desde, Venta.fecha_hora < hoy.replace(day=1)))
+    if id_producto is not None:
+        consulta_real = consulta_real.filter(DetalleVenta.id_producto == id_producto)
+    real = {(i, int(a), int(m)): c for i, a, m, c in consulta_real.group_by(DetalleVenta.id_producto, anio, mes).all()}
+    filas = []
+    for (i, periodo), p in ultimas.items():
+        fila = aciertos.evaluar(p.demanda_estimada, real.get((i, periodo.year, periodo.month), 0), p.error_validacion, p.confiabilidad)
+        fila.update(id_producto=i, nombre=p.producto.nombre_producto, periodo=periodo)
+        filas.append(fila)
+    filas.sort(key=lambda f: (f["periodo"], f["estimado"]), reverse=True)
+    return filas
+
+
+# historial de aciertos: por cada mes que ya terminó, cuánto se esperaba vender, cuánto se vendió y en qué productos falló más
+@bp.route("/aciertos")
+@login_required
+@rol_requerido("Administrador")
+def historial_aciertos():
+    try:
+        filas = _comparar_pronosticos_pasados(date.today())
+    except SQLAlchemyError as error:
+        registrar_error_conexion("calcular el historial de aciertos", error)
+        flash(MENSAJE_ERROR_CONEXION, "danger")
+        return render_template("analitica/aciertos.html", meses=[], ejecucion=None), 503
+    por_mes = {}
+    for f in filas:
+        por_mes.setdefault(f["periodo"], []).append(f)
+    meses = []
+    for periodo, productos in por_mes.items():
+        resumen = aciertos.resumir_periodo(productos)
+        # los que más se desviaron en unidades: es donde conviene mirar primero
+        mayores = sorted(productos, key=lambda f: -abs(f["diferencia"]))[:5]
+        meses.append({"periodo": periodo, "resumen": resumen, "texto": aciertos.texto_acierto(resumen), "mayores": mayores})
+    return render_template("analitica/aciertos.html", meses=meses, ejecucion=_ejecucion_o_none())
 
 
 # pantalla de segmentacion ABC: clasificacion de productos segun su
