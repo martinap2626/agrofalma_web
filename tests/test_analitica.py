@@ -655,12 +655,12 @@ def test_la_carga_de_inventario_real_queda_en_el_kardex_y_devuelve_las_respuesta
         inv["stock_actual"] = [10, 5, 8]
         datos = libro.parse("Datos del conteo")
         datos.loc[datos["campo"] == "dias_reposicion", "valor"] = "20"
-        datos.loc[datos["campo"] == "fecha_del_conteo", "valor"] = "2026-10-20"
+        datos.loc[datos["campo"] == "fecha_del_conteo", "valor"] = "2026-01-15"  # fija y distinta de hoy (la plantilla usa la fecha del día)
         with pd.ExcelWriter(ruta) as w:
             datos.to_excel(w, sheet_name="Datos del conteo", index=False)
             inv.to_excel(w, sheet_name="Inventario", index=False)
         simulacion = srv.cargar_inventario(ruta, aplicar=False)
-        propios = MovimientoInventario.motivo.like("%conteo del 2026-10-20%")
+        propios = MovimientoInventario.motivo.like("%conteo del 2026-01-15%")
         assert simulacion["respuestas"] == {"dias_reposicion": "20"} and MovimientoInventario.query.filter(propios).count() == 0
         srv.cargar_inventario(ruta, aplicar=True)
         movimientos = MovimientoInventario.query.filter(propios).all()
