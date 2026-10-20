@@ -101,16 +101,26 @@ def localizar_binario(nombre: str) -> str:
 
 
 # crea un archivo temporal de credenciales para que la contraseña no aparezca en los argumentos del proceso
+def _cuenta(config, rol: str) -> tuple[str, str]:
+    """Usuario y clave de MySQL para un uso: «RESPALDO» (volcado, solo lectura) o «ADMIN» (restaurar y verificar).
+    Si esa cuenta no está definida se usa la de la aplicación (DB_USER)."""
+    usuario = getattr(config, f"DB_{rol}_USER", None)
+    if usuario:
+        return usuario, str(getattr(config, f"DB_{rol}_PASSWORD", "") or "")
+    return config.DB_USER, str(config.DB_PASSWORD)
+
+
 @contextmanager
-def archivo_credenciales(config):
+def archivo_credenciales(config, rol: str = "ADMIN"):
     descriptor, ruta = tempfile.mkstemp(suffix=".cnf", prefix="agrofalma_")
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as archivo:
             archivo.write("[client]\n")
             archivo.write(f"host={config.DB_HOST}\n")
             archivo.write(f"port={config.DB_PORT}\n")
-            archivo.write(f"user={config.DB_USER}\n")
-            clave = str(config.DB_PASSWORD).replace("\\", "\\\\").replace('"', '\\"')
+            usuario, clave_cuenta = _cuenta(config, rol)
+            archivo.write(f"user={usuario}\n")
+            clave = clave_cuenta.replace("\\", "\\\\").replace('"', '\\"')
             archivo.write(f'password="{clave}"\n')
         yield ruta
     finally:
@@ -118,11 +128,12 @@ def archivo_credenciales(config):
 
 
 def ejecutar_mysqldump(config, ruta_destino: Path, nombre_bd: str | None = None) -> None:
-    with archivo_credenciales(config) as credenciales:
+    with archivo_credenciales(config, "RESPALDO") as credenciales:
         comando = [
             localizar_binario("mysqldump"),
             f"--defaults-extra-file={credenciales}",  # debe ir primero
             "--single-transaction",  # respaldo consistente sin bloquear tablas InnoDB
+            "--no-tablespaces",  # así la cuenta de respaldo no necesita el permiso PROCESS
             "--routines",
             "--triggers",
             nombre_bd or config.DB_NAME,
@@ -269,9 +280,10 @@ def _validar_nombre_bd(nombre: str) -> str:
 
 
 def _conectar(config, bd: str | None = None):
+    usuario, clave = _cuenta(config, "ADMIN")
     return pymysql.connect(
-        host=config.DB_HOST, port=int(config.DB_PORT), user=config.DB_USER,
-        password=config.DB_PASSWORD, database=bd, charset="utf8mb4",
+        host=config.DB_HOST, port=int(config.DB_PORT), user=usuario,
+        password=clave, database=bd, charset="utf8mb4",
     )
 
 

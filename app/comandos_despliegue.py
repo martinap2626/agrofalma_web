@@ -228,6 +228,8 @@ def registrar_comandos_despliegue(app) -> None:
             else:
                 permisos = "SELECT, INSERT, UPDATE, DELETE"
             lineas.append(f"GRANT {permisos} ON `{base}`.`{tabla.name}` TO '{usuario}'@'{host}';")
+        # la aplicación lee en qué versión de la estructura está la base (verificar-despliegue y el aviso de migraciones)
+        lineas.append(f"GRANT SELECT ON `{base}`.`alembic_version` TO '{usuario}'@'{host}';")
         lineas.append("FLUSH PRIVILEGES;")
         lineas.append("-- Los cambios de estructura (flask preparar-bd) y los respaldos (mysqldump) necesitan permisos mayores:")
         lineas.append("-- hazlos con otra cuenta de administración (DB_USER y DB_PASSWORD temporales), no con la de la aplicación.")

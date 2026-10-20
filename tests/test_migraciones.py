@@ -24,7 +24,7 @@ BD = "agrofalma_migraciones_test"
 
 
 def conexion_admin():
-    return pymysql.connect(host=Config.DB_HOST, port=int(Config.DB_PORT), user=Config.DB_USER, password=Config.DB_PASSWORD, autocommit=True)
+    return pymysql.connect(host=Config.DB_HOST, port=int(Config.DB_PORT), user=Config.DB_ADMIN_USER, password=Config.DB_ADMIN_PASSWORD, autocommit=True)
 
 
 def recrear_bd():
@@ -41,7 +41,7 @@ def app_vacia():
     except pymysql.err.Error:
         pytest.skip("la cuenta de pruebas no puede crear bases de datos")
     config = type("ConfigMigraciones", (ConfigPruebas,), {
-        "SQLALCHEMY_DATABASE_URI": f"mysql+pymysql://{Config.DB_USER}:{Config.DB_PASSWORD}@{Config.DB_HOST}:{Config.DB_PORT}/{BD}?charset=utf8mb4",
+        "SQLALCHEMY_DATABASE_URI": f"mysql+pymysql://{Config.DB_ADMIN_USER}:{Config.DB_ADMIN_PASSWORD}@{Config.DB_HOST}:{Config.DB_PORT}/{BD}?charset=utf8mb4",
     })
     aplicacion = create_app(config)
     yield aplicacion

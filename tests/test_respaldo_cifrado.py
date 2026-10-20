@@ -217,7 +217,7 @@ def test_restaurar_un_respaldo_cifrado_sin_la_clave_falla_con_un_mensaje_claro(a
     # y no quedó una base de datos vacía a medias
     import pymysql
 
-    conexion = pymysql.connect(host=Config.DB_HOST, port=int(Config.DB_PORT), user=Config.DB_USER, password=Config.DB_PASSWORD)
+    conexion = pymysql.connect(host=Config.DB_HOST, port=int(Config.DB_PORT), user=Config.DB_ADMIN_USER, password=Config.DB_ADMIN_PASSWORD)
     with conexion.cursor() as cursor:
         cursor.execute("SHOW DATABASES LIKE 'agrofalma_restauracion_test'")
         assert cursor.fetchone() is None

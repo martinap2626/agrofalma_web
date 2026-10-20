@@ -19,6 +19,9 @@ from app.extensions import db
 from app.models import Categoria, Cliente, Producto, Rol, Sede, StockPorSede, UnidadMedida, Usuario
 from config import Config
 
+# las bases de prueba las crea y respalda la cuenta de administración (la de respaldo del .env solo ve agrofalma_bd)
+Config.DB_RESPALDO_USER, Config.DB_RESPALDO_PASSWORD = Config.DB_ADMIN_USER, Config.DB_ADMIN_PASSWORD
+
 NOMBRE_BD_PRUEBAS = os.environ.get("DB_NAME_TEST", "agrofalma_test")
 CLAVE_ADMIN = "AdminPrueba2026"
 CLAVE_TRABAJADOR = "TrabajoPrueba2026"
@@ -29,7 +32,7 @@ class ConfigPruebas(Config):
     SECRET_KEY = "clave-de-pruebas-larga-y-aleatoria-0123456789"
     WTF_CSRF_ENABLED = False
     SQLALCHEMY_DATABASE_URI = (
-        f"mysql+pymysql://{Config.DB_USER}:{Config.DB_PASSWORD}@{Config.DB_HOST}:{Config.DB_PORT}/"
+        f"mysql+pymysql://{Config.DB_ADMIN_USER}:{Config.DB_ADMIN_PASSWORD}@{Config.DB_HOST}:{Config.DB_PORT}/"
         f"{NOMBRE_BD_PRUEBAS}?charset=utf8mb4"
     )
     LOGIN_MAX_INTENTOS = 5
@@ -48,7 +51,7 @@ class ConfigPruebasConCSRF(ConfigPruebas):
 def _crear_bd_pruebas():
     assert NOMBRE_BD_PRUEBAS.endswith("_test"), "La base de pruebas debe terminar en _test"
     conexion = pymysql.connect(
-        host=Config.DB_HOST, port=int(Config.DB_PORT), user=Config.DB_USER, password=Config.DB_PASSWORD
+        host=Config.DB_HOST, port=int(Config.DB_PORT), user=Config.DB_ADMIN_USER, password=Config.DB_ADMIN_PASSWORD
     )
     try:
         with conexion.cursor() as cursor:

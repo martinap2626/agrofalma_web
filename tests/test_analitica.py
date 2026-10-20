@@ -256,7 +256,7 @@ def test_el_motivo_cabe_en_la_columna():
 @pytest.fixture(scope="module")
 def app_a():
     assert BD_ANALITICA.endswith("_test")
-    con = pymysql.connect(host=Config.DB_HOST, port=int(Config.DB_PORT), user=Config.DB_USER, password=Config.DB_PASSWORD)
+    con = pymysql.connect(host=Config.DB_HOST, port=int(Config.DB_PORT), user=Config.DB_ADMIN_USER, password=Config.DB_ADMIN_PASSWORD)
     with con.cursor() as cur:
         cur.execute(f"DROP DATABASE IF EXISTS `{BD_ANALITICA}`")
         cur.execute(f"CREATE DATABASE `{BD_ANALITICA}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
@@ -264,7 +264,7 @@ def app_a():
     con.close()
 
     class Cfg(ConfigPruebas):
-        SQLALCHEMY_DATABASE_URI = (f"mysql+pymysql://{Config.DB_USER}:{Config.DB_PASSWORD}@{Config.DB_HOST}:{Config.DB_PORT}/"
+        SQLALCHEMY_DATABASE_URI = (f"mysql+pymysql://{Config.DB_ADMIN_USER}:{Config.DB_ADMIN_PASSWORD}@{Config.DB_HOST}:{Config.DB_PORT}/"
                                    f"{BD_ANALITICA}?charset=utf8mb4")
 
     app = create_app(Cfg)

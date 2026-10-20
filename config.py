@@ -34,6 +34,14 @@ class Config:
     DB_PORT = os.environ.get("DB_PORT", "3306")
     DB_NAME = os.environ.get("DB_NAME", "agrofalma_bd")
 
+    # Cuentas de MySQL de uso aparte de la aplicación (opcionales; si faltan, se usa DB_USER/DB_PASSWORD):
+    #   DB_RESPALDO_*  solo lectura, para el volcado (mysqldump)
+    #   DB_ADMIN_*     administración: restaurar, simulacro de recuperación, cambios de estructura y pruebas
+    DB_RESPALDO_USER = os.environ.get("DB_RESPALDO_USER") or DB_USER
+    DB_RESPALDO_PASSWORD = os.environ.get("DB_RESPALDO_PASSWORD") if os.environ.get("DB_RESPALDO_USER") else DB_PASSWORD
+    DB_ADMIN_USER = os.environ.get("DB_ADMIN_USER") or DB_USER
+    DB_ADMIN_PASSWORD = os.environ.get("DB_ADMIN_PASSWORD") if os.environ.get("DB_ADMIN_USER") else DB_PASSWORD
+
     SQLALCHEMY_DATABASE_URI = (
         f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
         f"?charset=utf8mb4"

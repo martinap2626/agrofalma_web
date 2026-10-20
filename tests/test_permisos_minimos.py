@@ -18,7 +18,7 @@ CLAVE = "ClaveTemporalDePermisos2026"
 
 
 def conexion_admin():
-    return pymysql.connect(host=Config.DB_HOST, port=int(Config.DB_PORT), user=Config.DB_USER, password=Config.DB_PASSWORD, autocommit=True)
+    return pymysql.connect(host=Config.DB_HOST, port=int(Config.DB_PORT), user=Config.DB_ADMIN_USER, password=Config.DB_ADMIN_PASSWORD, autocommit=True)
 
 
 @pytest.fixture(scope="module")
@@ -38,9 +38,12 @@ def entorno():
             "SQLALCHEMY_DATABASE_URI": f"mysql+pymysql://{usuario}:{clave}@{Config.DB_HOST}:{Config.DB_PORT}/{BD}?charset=utf8mb4",
         })
 
-    app_admin = create_app(configuracion(Config.DB_USER, Config.DB_PASSWORD))
+    app_admin = create_app(configuracion(Config.DB_ADMIN_USER, Config.DB_ADMIN_PASSWORD))
     with app_admin.app_context():
         db.create_all()
+        # una base preparada con las migraciones tiene esta tabla; el usuario de la aplicación la lee (estado de la estructura)
+        db.session.execute(db.text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL PRIMARY KEY)"))
+        db.session.commit()
         _sembrar()
         sql = app_admin.test_cli_runner().invoke(args=["permisos-bd", "--usuario", USUARIO]).output
     sql = sql.replace("CAMBIAR_ESTA_CLAVE_POR_UNA_LARGA", CLAVE).replace("`agrofalma_bd`", f"`{BD}`")
