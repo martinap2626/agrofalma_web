@@ -11,13 +11,6 @@
     el stock con un conteo físico; cada cambio queda en el historial del producto (kárdex) con quién lo hizo y por qué.
 </p>
 
-{% if provisionales %}
-<div class="alerta alerta-warning" role="note" style="margin-bottom:16px">
-    {{ provisionales }} producto(s) de esta sede tienen un stock <strong>estimado</strong> (provisional), calculado a partir de las ventas.
-    Haz un conteo físico de cada uno para que las recomendaciones de reposición usen el stock real.
-</div>
-{% endif %}
-
 <form method="GET" class="tarjeta" style="margin-bottom:18px" role="search">
     <div class="fila-formulario">
         <div>

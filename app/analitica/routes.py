@@ -424,9 +424,16 @@ def _comparar_pronosticos_pasados(hoy, id_producto=None):
     if id_producto is not None:
         consulta_real = consulta_real.filter(DetalleVenta.id_producto == id_producto)
     real = {(i, int(a), int(m)): c for i, a, m, c in consulta_real.group_by(DetalleVenta.id_producto, anio, mes).all()}
+    # un mes sin ninguna venta registrada en toda la plataforma no se compara: vender 0 caería "dentro del rango" de los productos
+    # de pronóstico pequeño y aparentaría un acierto que no existe
+    meses_con_ventas = {(int(a), int(m)) for a, m in db.session.query(anio, mes)
+                        .filter(Venta.anulada.is_(False), Venta.fecha_hora >= desde, Venta.fecha_hora < hoy.replace(day=1))
+                        .group_by(anio, mes).all()}
     filas = []
     for (i, periodo), p in ultimas.items():
-        fila = aciertos.evaluar(p.demanda_estimada, real.get((i, periodo.year, periodo.month), 0), p.error_validacion, p.confiabilidad)
+        if (periodo.year, periodo.month) not in meses_con_ventas:
+            continue
+        fila =aciertos.evaluar(p.demanda_estimada, real.get((i, periodo.year, periodo.month), 0), p.error_validacion, p.confiabilidad)
         fila.update(id_producto=i, nombre=p.producto.nombre_producto, periodo=periodo)
         filas.append(fila)
     filas.sort(key=lambda f: (f["periodo"], f["estimado"]), reverse=True)
