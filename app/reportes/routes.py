@@ -148,7 +148,10 @@ def _leer_filtros(args):
     try:
         desde = date.fromisoformat(args.get("desde", "").strip())
     except ValueError:
-        desde = hoy.replace(day=1)
+        try:
+            desde = date.fromisoformat(current_app.config.get("DEMO_DESDE", ""))  # solo la demo del video lo fija
+        except ValueError:
+            desde = hoy.replace(day=1)
     try:
         hasta = date.fromisoformat(args.get("hasta", "").strip())
     except ValueError:

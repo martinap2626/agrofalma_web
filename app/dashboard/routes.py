@@ -16,7 +16,7 @@ el consolidado.
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from flask import Blueprint, render_template, request, flash
+from flask import Blueprint, current_app, render_template, request, flash
 from flask_login import login_required
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -83,7 +83,10 @@ def inicio():
         if not (1 <= mes <= 12 and 2000 <= anio <= 2100):
             raise ValueError  # mes o año imposibles: se usa el mes actual
     except ValueError:
-        anio, mes = hoy.year, hoy.month
+        try:
+            anio, mes = (int(parte) for parte in current_app.config.get("DEMO_MES", "").split("-"))  # solo la demo del video lo fija
+        except ValueError:
+            anio, mes = hoy.year, hoy.month
 
     valores_vacios = {
         "ventas_contado": Decimal("0"), "ventas_credito": Decimal("0"), "total_mes": Decimal("0"),

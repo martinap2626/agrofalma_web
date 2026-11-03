@@ -84,6 +84,12 @@ class Config:
     EXPORT_MAX_POR_VENTANA = int(os.environ.get("EXPORT_MAX_POR_VENTANA", "10"))
     EXPORT_VENTANA_MIN = int(os.environ.get("EXPORT_VENTANA_MIN", "10"))
 
+    # --- Solo para la base de DEMOSTRACION ----------------------------------
+    # vacías en el sistema real (cada pantalla muestra el mes o los días recientes). En la demo, cuyos datos terminan en agosto,
+    # las fija lanzar_demo.py para que ventas, reportes y dashboard abran con datos: DEMO_DESDE=2026-01-01, DEMO_MES=2026-08
+    DEMO_DESDE = os.environ.get("DEMO_DESDE", "")
+    DEMO_MES = os.environ.get("DEMO_MES", "")
+
     # --- Respaldos de la base de datos --------------------------------------
     # clave para cifrar los respaldos (si está vacía, se guardan sin cifrar); y carpeta FUERA del equipo (disco externo,
     # carpeta sincronizada con la nube, unidad de red) donde se deja una segunda copia de cada respaldo

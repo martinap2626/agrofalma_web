@@ -78,7 +78,10 @@ def listar():
     # sin ningún filtro de fechas, se muestran los últimos 30 días en vez de TODA la
     # historia (que crece sin parar y volvería lenta la pantalla); el filtro lo refleja
     if not desde and not hasta:
-        desde = date.today() - timedelta(days=30)
+        try:
+            desde = date.fromisoformat(current_app.config.get("DEMO_DESDE", ""))  # solo la demo del video lo fija
+        except ValueError:
+            desde = date.today() - timedelta(days=30)
 
     contexto_filtros = {
         "busqueda": busqueda, "desde": desde, "hasta": hasta,
